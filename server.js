@@ -1,3 +1,6 @@
+// Add dotenv config at the very top
+require('dotenv').config();
+
 /*
 CSC3916 HW4
 File: Server.js
