@@ -1,19 +1,16 @@
-const ua = require('universal-ga');
+const GA4 = require('node-ga4');
 
-// Replace with your Google Analytics Tracking ID from your Google Analytics account
-// Visit https://analytics.google.com/ to set up an account and get your tracking ID
-const GA_TRACKING_ID = 'UA-XXXXXXXX-X'; // Replace this with your actual tracking ID
+// Use your GA4 Measurement ID
+const GA4_MEASUREMENT_ID = 'G-B1QLX7WMCE';
 
-// Initialize with your tracking ID
-ua.initialize(GA_TRACKING_ID, {
-    debug: process.env.NODE_ENV !== 'production'
-});
+// Initialize GA4 with your measurement ID
+const ga4 = new GA4(GA4_MEASUREMENT_ID);
 
-// Set up custom dimensions and metrics
-// Custom Dimension 1: Movie Name
-// Custom Metric 1: Requested (value 1, it will aggregate)
-const DIMENSION_MOVIE_NAME = 1;
-const METRIC_REQUESTED = 1;
+// Define event parameters
+const EVENT_NAMES = {
+    MOVIE_VIEW: 'movie_view',
+    REVIEW_ACTION: 'review_action'
+};
 
 // Event Categories
 const CATEGORY = {
@@ -28,11 +25,11 @@ const CATEGORY = {
 
 // Action types
 const ACTION = {
-    GET_MOVIES: 'GET /movies',
-    GET_MOVIE: 'GET /movies/:id',
-    GET_REVIEWS: 'GET /reviews',
-    POST_REVIEWS: 'POST /reviews',
-    GET_MOVIE_REVIEWS: 'GET /reviews/:movieId'
+    GET_MOVIES: 'get_movies',
+    GET_MOVIE: 'get_movie',
+    GET_REVIEWS: 'get_reviews',
+    POST_REVIEWS: 'post_review',
+    GET_MOVIE_REVIEWS: 'get_movie_reviews'
 };
 
 // Event labels
@@ -49,21 +46,15 @@ const LABEL = {
 function trackMovie(movie, action) {
     if (!movie) return;
 
-    const customDimensions = {
-        [DIMENSION_MOVIE_NAME]: movie.title
-    };
-
-    const customMetrics = {
-        [METRIC_REQUESTED]: 1
-    };
-
-    ua.event({
-        category: movie.genre || 'Unknown',
-        action: action,
-        label: LABEL.MOVIE_REQUEST,
-        value: 1,
-        customDimensions,
-        customMetrics
+    ga4.event({
+        name: EVENT_NAMES.MOVIE_VIEW,
+        params: {
+            movie_name: movie.title,
+            movie_genre: movie.genre || 'Unknown',
+            action_type: action,
+            event_label: LABEL.MOVIE_REQUEST,
+            request_count: 1
+        }
     });
 }
 
@@ -76,21 +67,16 @@ function trackMovie(movie, action) {
 function trackReview(review, movie, action) {
     if (!movie) return;
 
-    const customDimensions = {
-        [DIMENSION_MOVIE_NAME]: movie.title
-    };
-
-    const customMetrics = {
-        [METRIC_REQUESTED]: 1
-    };
-
-    ua.event({
-        category: movie.genre || 'Unknown',
-        action: action,
-        label: LABEL.REVIEW_REQUEST,
-        value: 1,
-        customDimensions,
-        customMetrics
+    ga4.event({
+        name: EVENT_NAMES.REVIEW_ACTION,
+        params: {
+            movie_name: movie.title,
+            movie_genre: movie.genre || 'Unknown',
+            action_type: action,
+            event_label: LABEL.REVIEW_REQUEST,
+            request_count: 1,
+            rating: review.rating
+        }
     });
 }
 
