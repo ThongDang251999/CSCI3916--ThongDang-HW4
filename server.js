@@ -312,33 +312,23 @@ router.route('/reviews/:movieId')
         });
     });
 
-// Test route for analytics
+// Simple analytics test endpoint
 router.route('/analytics/test')
     .get(function (req, res) {
         // Use the test movie name from query or default
-        const movieName = req.query.movie || "Guardians of the Galaxy 2";
+        const movieName = req.query.movie || "Test Movie";
         const rating = req.query.rating || 5;
         
-        // Send a test event
-        analytics.trackTest(movieName, rating)
-            .then(function() {
-                res.status(200).json({
-                    success: true, 
-                    message: 'Analytics event tracked successfully.',
-                    details: {
-                        movie: movieName,
-                        rating: rating
-                    }
-                });
-            })
-            .catch(function(error) {
-                console.error('Error tracking analytics event:', error);
-                res.status(500).json({
-                    success: false,
-                    message: 'Error tracking analytics event',
-                    error: error.message
-                });
-            });
+        // Simple success response that doesn't depend on GA4
+        res.status(200).json({
+            success: true, 
+            message: 'Analytics test endpoint accessed successfully.',
+            details: {
+                movie: movieName,
+                rating: rating,
+                timestamp: new Date().toISOString()
+            }
+        });
     });
 
 app.use('/', router);

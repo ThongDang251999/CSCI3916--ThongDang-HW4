@@ -4,10 +4,13 @@ const crypto = require('crypto');
 // Use GA4 Measurement ID from environment variable or hardcoded value
 const GA4_MEASUREMENT_ID = process.env.GA_KEY || 'G-B1QLX7WMCE';
 
+console.log('Initializing GA4 with measurement ID:', GA4_MEASUREMENT_ID);
+
 // Initialize GA4 with your measurement ID and options
 const ga4 = new GA4(GA4_MEASUREMENT_ID, {
     // Generate a consistent client ID for each user session
-    clientId: () => crypto.randomBytes(16).toString("hex")
+    clientId: () => crypto.randomBytes(16).toString("hex"),
+    debug: true
 });
 
 // Define event parameters
@@ -95,17 +98,27 @@ function trackReview(review, movie, action) {
  * @returns {Promise} - Promise that resolves when the event is tracked
  */
 function trackTest(movieName, rating) {
-    return ga4.event({
-        name: EVENT_NAMES.TEST_EVENT,
-        params: {
-            movie_name: movieName || 'Test Movie',
-            movie_genre: CATEGORY.FEEDBACK,
-            action_type: ACTION.RATING,
-            event_label: LABEL.FEEDBACK,
-            request_count: 1,
-            rating: rating || 5
-        }
-    });
+    console.log('Tracking test event with:', { movieName, rating });
+    
+    try {
+        return ga4.event({
+            name: EVENT_NAMES.TEST_EVENT,
+            params: {
+                movie_name: movieName || 'Test Movie',
+                movie_genre: CATEGORY.FEEDBACK,
+                action_type: ACTION.RATING,
+                event_label: LABEL.FEEDBACK,
+                request_count: 1,
+                rating: rating || 5
+            }
+        }).catch(error => {
+            console.error('Error in GA4 event tracking:', error);
+            throw error;
+        });
+    } catch (err) {
+        console.error('Exception in trackTest:', err);
+        return Promise.reject(err);
+    }
 }
 
 module.exports = {
