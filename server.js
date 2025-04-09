@@ -18,6 +18,8 @@ var User = require('./Users');
 var Movie = require('./Movies');
 var Review = require('./Reviews');
 var mongoose = require('mongoose');
+// Import the analytics module
+var analytics = require('./analytics');
 
 var app = express();
 app.use(cors());
@@ -111,6 +113,12 @@ router.route('/movies')
                 if (err) {
                     return res.status(500).send(err);
                 }
+                
+                // Track analytics for each movie
+                movies.forEach(movie => {
+                    analytics.trackMovie(movie, analytics.ACTION.GET_MOVIES);
+                });
+                
                 res.json(movies);
             });
         } else {
@@ -118,6 +126,12 @@ router.route('/movies')
                 if (err) {
                     return res.status(500).send(err);
                 }
+                
+                // Track analytics for each movie
+                movies.forEach(movie => {
+                    analytics.trackMovie(movie, analytics.ACTION.GET_MOVIES);
+                });
+                
                 res.json(movies);
             });
         }
@@ -167,6 +181,10 @@ router.route('/movies/:id')
                 if (!movie || movie.length === 0) {
                     return res.status(404).json({ success: false, message: 'Movie not found' });
                 }
+                
+                // Track analytics for this movie
+                analytics.trackMovie(movie[0], analytics.ACTION.GET_MOVIE);
+                
                 res.json(movie[0]);
             });
         } else {
@@ -177,6 +195,10 @@ router.route('/movies/:id')
                 if (!movie) {
                     return res.status(404).json({ success: false, message: 'Movie not found' });
                 }
+                
+                // Track analytics for this movie
+                analytics.trackMovie(movie, analytics.ACTION.GET_MOVIE);
+                
                 res.json(movie);
             });
         }
@@ -209,6 +231,10 @@ router.route('/reviews')
                 if (err) {
                     return res.status(500).send(err);
                 }
+                
+                // Track the review creation with analytics
+                analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
+                
                 res.json({ message: 'Review created!' });
             });
         });
@@ -218,6 +244,35 @@ router.route('/reviews')
             if (err) {
                 return res.status(500).send(err);
             }
+            
+            // If there are reviews, we need to get the corresponding movies
+            // for proper analytics tracking
+            if (reviews.length > 0) {
+                // Get unique movie IDs
+                const movieIds = [...new Set(reviews.map(r => r.movieId))];
+                
+                // Find all these movies
+                Movie.find({
+                    '_id': { $in: movieIds }
+                }, function(err, movies) {
+                    if (err) {
+                        console.error('Error fetching movies for reviews analytics:', err);
+                    } else {
+                        // Create a map of movie IDs to movie objects
+                        const movieMap = {};
+                        movies.forEach(m => movieMap[m._id] = m);
+                        
+                        // Track analytics for each review
+                        reviews.forEach(review => {
+                            const movie = movieMap[review.movieId];
+                            if (movie) {
+                                analytics.trackReview(review, movie, analytics.ACTION.GET_REVIEWS);
+                            }
+                        });
+                    }
+                });
+            }
+            
             res.json(reviews);
         });
     });
@@ -225,12 +280,65 @@ router.route('/reviews')
 // Get reviews for a specific movie
 router.route('/reviews/:movieId')
     .get(function (req, res) {
-        Review.find({ movieId: req.params.movieId }, function(err, reviews) {
+        const movieId = req.params.movieId;
+        
+        // Find the movie first
+        Movie.findById(movieId, function(err, movie) {
             if (err) {
-                return res.status(500).send(err);
+                console.error('Error finding movie for reviews analytics:', err);
+            } else if (movie) {
+                // Then find and return the reviews
+                Review.find({ movieId: movieId }, function(err, reviews) {
+                    if (err) {
+                        return res.status(500).send(err);
+                    }
+                    
+                    // Track analytics for this request
+                    reviews.forEach(review => {
+                        analytics.trackReview(review, movie, analytics.ACTION.GET_MOVIE_REVIEWS);
+                    });
+                    
+                    res.json(reviews);
+                });
+            } else {
+                // No movie found, just look for reviews
+                Review.find({ movieId: movieId }, function(err, reviews) {
+                    if (err) {
+                        return res.status(500).send(err);
+                    }
+                    res.json(reviews);
+                });
             }
-            res.json(reviews);
         });
+    });
+
+// Test route for analytics
+router.route('/analytics/test')
+    .get(function (req, res) {
+        // Use the test movie name from query or default
+        const movieName = req.query.movie || "Guardians of the Galaxy 2";
+        const rating = req.query.rating || 5;
+        
+        // Send a test event
+        analytics.trackTest(movieName, rating)
+            .then(function() {
+                res.status(200).json({
+                    success: true, 
+                    message: 'Analytics event tracked successfully.',
+                    details: {
+                        movie: movieName,
+                        rating: rating
+                    }
+                });
+            })
+            .catch(function(error) {
+                console.error('Error tracking analytics event:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Error tracking analytics event',
+                    error: error.message
+                });
+            });
     });
 
 app.use('/', router);
