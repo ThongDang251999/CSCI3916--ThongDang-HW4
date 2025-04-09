@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Web API 3916 Homework 3",
   "main": "server.js",
+  "engines": {
+    "node": "16.x"
+  },
   "scripts": {
     "test": "mocha --timeout 10000 --exit"
   },

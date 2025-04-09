@@ -1,17 +1,35 @@
-const GA4 = require('node-ga4');
+// Simple fallback analytics implementation
 const crypto = require('crypto');
+let ga4;
+let isFallback = false;
 
-// Use GA4 Measurement ID from environment variable or hardcoded value
-const GA4_MEASUREMENT_ID = process.env.GA_KEY || 'G-B1QLX7WMCE';
-
-console.log('Initializing GA4 with measurement ID:', GA4_MEASUREMENT_ID);
-
-// Initialize GA4 with your measurement ID and options
-const ga4 = new GA4(GA4_MEASUREMENT_ID, {
-    // Generate a consistent client ID for each user session
-    clientId: () => crypto.randomBytes(16).toString("hex"),
-    debug: true
-});
+// Try to load node-ga4, but fall back to a simple implementation if it fails
+try {
+    const GA4 = require('node-ga4');
+    
+    // Use GA4 Measurement ID from environment variable or hardcoded value
+    const GA4_MEASUREMENT_ID = process.env.GA_KEY || 'G-B1QLX7WMCE';
+    
+    console.log('Initializing GA4 with measurement ID:', GA4_MEASUREMENT_ID);
+    
+    // Initialize GA4 with your measurement ID and options
+    ga4 = new GA4(GA4_MEASUREMENT_ID, {
+        // Generate a consistent client ID for each user session
+        clientId: () => crypto.randomBytes(16).toString("hex"),
+        debug: true
+    });
+} catch (error) {
+    console.error('Failed to initialize node-ga4, using fallback implementation:', error.message);
+    isFallback = true;
+    
+    // Create a dummy ga4 object that won't crash the application
+    ga4 = {
+        event: (params) => {
+            console.log('Analytics event (fallback):', params);
+            return Promise.resolve({ success: true, fallback: true });
+        }
+    };
+}
 
 // Define event parameters
 const EVENT_NAMES = {
@@ -55,9 +73,11 @@ const LABEL = {
  * @param {String} action - The action being performed
  */
 function trackMovie(movie, action) {
-    if (!movie) return;
+    if (!movie) return Promise.resolve({ success: false, reason: 'No movie provided' });
 
-    ga4.event({
+    console.log(`Tracking movie view: ${movie.title}, action: ${action}`);
+    
+    return ga4.event({
         name: EVENT_NAMES.MOVIE_VIEW,
         params: {
             movie_name: movie.title,
@@ -66,6 +86,9 @@ function trackMovie(movie, action) {
             event_label: LABEL.MOVIE_REQUEST,
             request_count: 1
         }
+    }).catch(error => {
+        console.error('Error tracking movie view:', error);
+        return { success: false, error: error.message };
     });
 }
 
@@ -76,9 +99,11 @@ function trackMovie(movie, action) {
  * @param {String} action - The action being performed
  */
 function trackReview(review, movie, action) {
-    if (!movie) return;
+    if (!movie) return Promise.resolve({ success: false, reason: 'No movie provided' });
 
-    ga4.event({
+    console.log(`Tracking review action: ${movie.title}, action: ${action}, rating: ${review.rating}`);
+    
+    return ga4.event({
         name: EVENT_NAMES.REVIEW_ACTION,
         params: {
             movie_name: movie.title,
@@ -88,6 +113,9 @@ function trackReview(review, movie, action) {
             request_count: 1,
             rating: review.rating
         }
+    }).catch(error => {
+        console.error('Error tracking review action:', error);
+        return { success: false, error: error.message };
     });
 }
 
@@ -98,7 +126,7 @@ function trackReview(review, movie, action) {
  * @returns {Promise} - Promise that resolves when the event is tracked
  */
 function trackTest(movieName, rating) {
-    console.log('Tracking test event with:', { movieName, rating });
+    console.log(`Tracking test event: ${movieName}, rating: ${rating}`);
     
     try {
         return ga4.event({
@@ -113,11 +141,11 @@ function trackTest(movieName, rating) {
             }
         }).catch(error => {
             console.error('Error in GA4 event tracking:', error);
-            throw error;
+            return { success: false, error: error.message };
         });
     } catch (err) {
         console.error('Exception in trackTest:', err);
-        return Promise.reject(err);
+        return Promise.resolve({ success: false, error: err.message });
     }
 }
 
@@ -127,5 +155,6 @@ module.exports = {
     LABEL,
     trackMovie,
     trackReview,
-    trackTest
+    trackTest,
+    isFallback
 }; 
