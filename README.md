@@ -1,6 +1,6 @@
 # Assignment Four
 ## Purpose
-The purpose of this assignment is to leverage Google’s analytics policies to gather information about the requests being sent in by users.
+The purpose of this assignment is to leverage Google's analytics policies to gather information about the requests being sent in by users.
 
 Using the information already entered to MongoDB for the previous assignment, you will add another collection of reviews that are tied to the movies. This way users can query the database and get the previous information (title, year released and actors) as well as the reviews. These two entities should remain separate! Do not append the reviews to the existing movie information.  
 
@@ -67,4 +67,53 @@ Leverage the Async.js library or mongo $lookup aggregation capability to join th
 - https://support.google.com/analytics/answer/2709829
 
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://app.getpostman.com/run-collection/41738630-ef65f9d7-2b64-40af-a9a2-6358f1a6253f?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D41738630-ef65f9d7-2b64-40af-a9a2-6358f1a6253f%26entityType%3Dcollection%26workspaceId%3D77c36a26-bf1f-4213-a6de-4ea208f5bdf5#?env%5BThongDang-HW4%5D=W3sia2V5IjoiYmFzZV91cmwiLCJ2YWx1ZSI6Imh0dHBzOi8vY3NjaTM5MTYtdGhvbmdkYW5nLWh3NC5vbnJlbmRlci5jb20iLCJlbmFibGVkIjp0cnVlLCJzZXNzaW9uVmFsdWUiOiJodHRwczovL2NzY2kzOTE2LXRob25nZGFuZy1odzQub25yZW5kZXIuY29tIiwiY29tcGxldGVTZXNzaW9uVmFsdWUiOiJodHRwczovL2NzY2kzOTE2LXRob25nZGFuZy1odzQub25yZW5kZXIuY29tIiwic2Vzc2lvbkluZGV4IjowfSx7ImtleSI6ImF1dGhfdG9rZW4iLCJ2YWx1ZSI6IiIsImVuYWJsZWQiOnRydWUsInNlc3Npb25WYWx1ZSI6IkpXVC4uLiIsImNvbXBsZXRlU2Vzc2lvblZhbHVlIjoiSldUIGV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpwWkNJNklqWTNaalJqT1RVNU1UazROREZoTURBME5tWmpaR1E1T1NJc0luVnpaWEp1WVcxbElqb2lkWE5sY2pFM05EUXdPVFUxTlRVNU5ETWlMQ0pwWVhRaU9qRTNORFF3T1RVMU9EVjkuX1R2eFJrLVp3M2RBS2hfLXF4WFMtbUVBT0hEWTdiTWxlTGNzR0xpN21JdyIsInNlc3Npb25JbmRleCI6MX0seyJrZXkiOiJ0ZXN0X3VzZXJuYW1lIiwidmFsdWUiOiIiLCJlbmFibGVkIjp0cnVlLCJzZXNzaW9uVmFsdWUiOiJ1c2VyMTc0NDA5NTU1NTk0MyIsImNvbXBsZXRlU2Vzc2lvblZhbHVlIjoidXNlcjE3NDQwOTU1NTU5NDMiLCJzZXNzaW9uSW5kZXgiOjJ9LHsia2V5IjoidGVzdF9wYXNzd29yZCIsInZhbHVlIjoiIiwiZW5hYmxlZCI6dHJ1ZSwic2Vzc2lvblZhbHVlIjoicGFzc3dvcmQxNzQ0MDk1NTU1OTQzIiwiY29tcGxldGVTZXNzaW9uVmFsdWUiOiJwYXNzd29yZDE3NDQwOTU1NTU5NDMiLCJzZXNzaW9uSW5kZXgiOjN9LHsia2V5IjoidGVzdF9uYW1lIiwidmFsdWUiOiIiLCJlbmFibGVkIjp0cnVlLCJzZXNzaW9uVmFsdWUiOiJVc2VyIDE3NDQwOTU1NTU5NDMiLCJjb21wbGV0ZVNlc3Npb25WYWx1ZSI6IlVzZXIgMTc0NDA5NTU1NTk0MyIsInNlc3Npb25JbmRleCI6NH0seyJrZXkiOiJtb3ZpZV9pZCIsInZhbHVlIjoiIiwiZW5hYmxlZCI6dHJ1ZSwic2Vzc2lvblZhbHVlIjoiIiwiY29tcGxldGVTZXNzaW9uVmFsdWUiOiIiLCJzZXNzaW9uSW5kZXgiOjV9XQ==)
+
+## Extra Credit: Custom Analytics Implementation
+
+For the extra credit portion, I've implemented a custom analytics policy that tracks the number of times each movie has been reviewed using Google Analytics 4 (GA4). 
+
+### Analytics Implementation Details
+
+My implementation in `analytics.js` captures the following data:
+
+1. **Custom Dimension**: Movie Name
+   - Each movie title is tracked as `movie_name` parameter
+
+2. **Custom Metric**: Request Count 
+   - Each review adds a count of 1 to aggregate the total number of reviews
+
+3. **Event Category**: Movie Genre
+   - The genre of the movie is tracked as `movie_genre` parameter
+
+4. **Event Action**: API Path
+   - Actions like "post_review" and "get_movie_reviews" are tracked
+
+5. **Event Label**: API Request Description
+   - "API Request for Movie Review" is tracked for review events
+
+### Integration Points
+
+Analytics events are tracked at the following points:
+
+1. When a user submits a review for a movie
+2. When a user views movie details
+3. When a user views reviews for a movie
+
+### Testing Analytics
+
+The analytics implementation can be tested using:
+
+1. The Postman collection's "Test Analytics" request
+2. Directly accessing the `/analytics/test` endpoint with parameters:
+   ```
+   https://csci3916-thongdang-hw4.onrender.com/analytics/test?movie=TestMovie&rating=5
+   ```
+
+### GA4 Configuration
+
+The Google Analytics 4 property is configured with:
+- Measurement ID: G-B1QLX7WMCE
+- API Secret: (stored securely in environment variables)
+
+As noted in the assignment instructions, GA4 events may take 24-48 hours to appear in reports.
 
