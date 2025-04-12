@@ -315,6 +315,12 @@ router.route('/reviews/:movieId')
 // Simple analytics test endpoint
 router.route('/analytics/test')
     .get(function (req, res) {
+        console.log('Analytics test endpoint called with:', {
+            query: req.query,
+            ga_key: process.env.GA_KEY,
+            ga_secret_available: !!process.env.GA_SECRET
+        });
+
         // Use the test movie name from query or default
         const movieName = req.query.movie || "Test Movie";
         const rating = req.query.rating || 5;
@@ -323,6 +329,7 @@ router.route('/analytics/test')
             // Send a test event
             analytics.trackTest(movieName, rating)
                 .then(function(result) {
+                    console.log('Analytics test result:', result);
                     res.status(200).json({
                         success: true, 
                         message: 'Analytics test endpoint accessed successfully.',
@@ -330,7 +337,8 @@ router.route('/analytics/test')
                             movie: movieName,
                             rating: rating,
                             timestamp: new Date().toISOString(),
-                            fallback: analytics.isFallback || false,
+                            ga_key: process.env.GA_KEY,
+                            ga_secret_available: !!process.env.GA_SECRET,
                             result: result
                         }
                     });
@@ -338,26 +346,30 @@ router.route('/analytics/test')
                 .catch(function(error) {
                     console.error('Error in analytics test endpoint:', error);
                     res.status(200).json({
-                        success: true, // Still return success to avoid failing tests
+                        success: false,
                         message: 'Analytics test completed with errors',
                         details: {
                             movie: movieName,
                             rating: rating,
                             timestamp: new Date().toISOString(),
-                            error: error.message || 'Unknown error'
+                            error: error.message || 'Unknown error',
+                            ga_key: process.env.GA_KEY,
+                            ga_secret_available: !!process.env.GA_SECRET
                         }
                     });
                 });
         } catch (err) {
             console.error('Exception in analytics test route:', err);
             res.status(200).json({
-                success: true, // Still return success to avoid failing tests
+                success: false,
                 message: 'Analytics test completed with exception',
                 details: {
                     movie: movieName,
                     rating: rating,
                     timestamp: new Date().toISOString(),
-                    error: err.message || 'Unknown error'
+                    error: err.message || 'Unknown error',
+                    ga_key: process.env.GA_KEY,
+                    ga_secret_available: !!process.env.GA_SECRET
                 }
             });
         }
