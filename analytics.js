@@ -1,49 +1,17 @@
-// Simple fallback analytics implementation
+// Simple analytics implementation using GA4 Measurement Protocol
 const crypto = require('crypto');
-let ga4;
-let isFallback = false;
+const axios = require('axios');
 
-// Try to load node-ga4, but fall back to a simple implementation if it fails
-async function initializeGA4() {
-    try {
-        const GA4 = await import('node-ga4');
-        
-        // Use GA4 Measurement ID from environment variable or hardcoded value
-        const GA4_MEASUREMENT_ID = process.env.GA_KEY || 'G-B1QLX7WMCE';
-        const GA4_API_SECRET = process.env.GA_SECRET;
-        
-        console.log('Initializing GA4 with:', {
-            measurement_id: GA4_MEASUREMENT_ID,
-            api_secret_available: !!GA4_API_SECRET,
-            api_secret_length: GA4_API_SECRET ? GA4_API_SECRET.length : 0,
-            api_secret_prefix: GA4_API_SECRET ? GA4_API_SECRET.substring(0, 4) : 'none'
-        });
-        
-        // Initialize GA4 with your measurement ID and options
-        ga4 = new GA4.default(GA4_MEASUREMENT_ID, {
-            // Generate a consistent client ID for each user session
-            clientId: () => crypto.randomBytes(16).toString("hex"),
-            debug: true,
-            secret: GA4_API_SECRET // Add the API secret here
-        });
-        
-        isFallback = false;
-    } catch (error) {
-        console.error('Failed to initialize node-ga4, using fallback implementation:', error.message);
-        isFallback = true;
-        
-        // Create a dummy ga4 object that won't crash the application
-        ga4 = {
-            event: (params) => {
-                console.log('Analytics event (fallback):', params);
-                return Promise.resolve({ success: true, fallback: true });
-            }
-        };
-    }
-}
+const GA4_MEASUREMENT_ID = process.env.GA_KEY || 'G-B1QLX7WMCE';
+const GA4_API_SECRET = process.env.GA_SECRET;
+const GA4_ENDPOINT = `https://www.google-analytics.com/mp/collect?measurement_id=${GA4_MEASUREMENT_ID}&api_secret=${GA4_API_SECRET}`;
 
-// Initialize GA4 when this module is loaded
-initializeGA4();
+console.log('Initializing GA4 with:', {
+    measurement_id: GA4_MEASUREMENT_ID,
+    api_secret_available: !!GA4_API_SECRET,
+    api_secret_length: GA4_API_SECRET ? GA4_API_SECRET.length : 0,
+    api_secret_prefix: GA4_API_SECRET ? GA4_API_SECRET.substring(0, 4) : 'none'
+});
 
 // Define event parameters
 const EVENT_NAMES = {
@@ -81,38 +49,55 @@ const LABEL = {
     FEEDBACK: 'Feedback for Movie'
 };
 
+// Helper function to send events to GA4
+async function sendEvent(name, params) {
+    try {
+        const clientId = crypto.randomBytes(16).toString("hex");
+        const payload = {
+            client_id: clientId,
+            events: [{
+                name,
+                params
+            }]
+        };
+
+        console.log('Sending GA4 event:', {
+            endpoint: GA4_ENDPOINT,
+            name,
+            params
+        });
+
+        const response = await axios.post(GA4_ENDPOINT, payload);
+        console.log('GA4 response:', response.status, response.statusText);
+        return { success: true, status: response.status };
+    } catch (error) {
+        console.error('GA4 error:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
 /**
  * Track a movie view
  * @param {Object} movie - The movie object
  * @param {String} action - The action being performed
  */
 async function trackMovie(movie, action) {
-    if (!movie) return Promise.resolve({ success: false, reason: 'No movie provided' });
+    if (!movie) return { success: false, reason: 'No movie provided' };
 
     console.log('Tracking movie view:', {
         title: movie.title,
         action: action,
-        measurement_id: process.env.GA_KEY || 'G-B1QLX7WMCE',
-        api_secret_available: !!process.env.GA_SECRET
+        measurement_id: GA4_MEASUREMENT_ID,
+        api_secret_available: !!GA4_API_SECRET
     });
     
-    try {
-        const response = await ga4.event({
-            name: EVENT_NAMES.MOVIE_VIEW,
-            params: {
-                movie_name: movie.title,
-                movie_genre: movie.genre || 'Unknown',
-                action_type: action,
-                event_label: LABEL.MOVIE_REQUEST,
-                request_count: 1
-            }
-        });
-        console.log('GA4 tracking success:', response);
-        return response;
-    } catch (error) {
-        console.error('GA4 tracking error:', error);
-        return { success: false, error: error.message };
-    }
+    return sendEvent(EVENT_NAMES.MOVIE_VIEW, {
+        movie_name: movie.title,
+        movie_genre: movie.genre || 'Unknown',
+        action_type: action,
+        event_label: LABEL.MOVIE_REQUEST,
+        request_count: 1
+    });
 }
 
 /**
@@ -122,34 +107,24 @@ async function trackMovie(movie, action) {
  * @param {String} action - The action being performed
  */
 async function trackReview(review, movie, action) {
-    if (!movie) return Promise.resolve({ success: false, reason: 'No movie provided' });
+    if (!movie) return { success: false, reason: 'No movie provided' };
 
     console.log('Tracking review action:', {
         movie: movie.title,
         action: action,
         rating: review.rating,
-        measurement_id: process.env.GA_KEY || 'G-B1QLX7WMCE',
-        api_secret_available: !!process.env.GA_SECRET
+        measurement_id: GA4_MEASUREMENT_ID,
+        api_secret_available: !!GA4_API_SECRET
     });
     
-    try {
-        const response = await ga4.event({
-            name: EVENT_NAMES.REVIEW_ACTION,
-            params: {
-                movie_name: movie.title,
-                movie_genre: movie.genre || 'Unknown',
-                action_type: action,
-                event_label: LABEL.REVIEW_REQUEST,
-                request_count: 1,
-                rating: review.rating
-            }
-        });
-        console.log('GA4 tracking success:', response);
-        return response;
-    } catch (error) {
-        console.error('GA4 tracking error:', error);
-        return { success: false, error: error.message };
-    }
+    return sendEvent(EVENT_NAMES.REVIEW_ACTION, {
+        movie_name: movie.title,
+        movie_genre: movie.genre || 'Unknown',
+        action_type: action,
+        event_label: LABEL.REVIEW_REQUEST,
+        request_count: 1,
+        rating: review.rating
+    });
 }
 
 /**
@@ -162,28 +137,18 @@ async function trackTest(movieName, rating) {
     console.log('Tracking test event:', {
         movie: movieName,
         rating: rating,
-        measurement_id: process.env.GA_KEY || 'G-B1QLX7WMCE',
-        api_secret_available: !!process.env.GA_SECRET
+        measurement_id: GA4_MEASUREMENT_ID,
+        api_secret_available: !!GA4_API_SECRET
     });
     
-    try {
-        const response = await ga4.event({
-            name: EVENT_NAMES.TEST_EVENT,
-            params: {
-                movie_name: movieName || 'Test Movie',
-                movie_genre: CATEGORY.FEEDBACK,
-                action_type: ACTION.RATING,
-                event_label: LABEL.FEEDBACK,
-                request_count: 1,
-                rating: rating || 5
-            }
-        });
-        console.log('GA4 test event success:', response);
-        return response;
-    } catch (error) {
-        console.error('GA4 test event error:', error);
-        return { success: false, error: error.message };
-    }
+    return sendEvent(EVENT_NAMES.TEST_EVENT, {
+        movie_name: movieName || 'Test Movie',
+        movie_genre: CATEGORY.FEEDBACK,
+        action_type: ACTION.RATING,
+        event_label: LABEL.FEEDBACK,
+        request_count: 1,
+        rating: rating || 5
+    });
 }
 
 module.exports = {
@@ -192,6 +157,5 @@ module.exports = {
     LABEL,
     trackMovie,
     trackReview,
-    trackTest,
-    isFallback
+    trackTest
 }; 
