@@ -26,6 +26,14 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
+// Enhanced CORS configuration
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    next();
+});
+
 app.use(passport.initialize());
 
 var router = express.Router();
@@ -95,11 +103,12 @@ router.post('/signin', function (req, res) {
 
 // Movie routes
 router.route('/movies')
-    .get(function (req, res) {
+    .get(authJwtController.isAuthenticated, function (req, res) {
         // If reviews=true is in the query parameters, include reviews
         var includeReviews = req.query.reviews === 'true';
         
         if (includeReviews) {
+            // Use aggregation to include reviews and calculate average rating
             Movie.aggregate([
                 {
                     $lookup: {
@@ -108,6 +117,14 @@ router.route('/movies')
                         foreignField: 'movieId',
                         as: 'reviews'
                     }
+                },
+                {
+                    $addFields: {
+                        avgRating: { $avg: '$reviews.rating' }
+                    }
+                },
+                {
+                    $sort: { avgRating: -1 } // Sort by average rating in descending order
                 }
             ]).exec(function(err, movies) {
                 if (err) {
@@ -146,6 +163,7 @@ router.route('/movies')
         movie.releaseDate = req.body.releaseDate;
         movie.genre = req.body.genre;
         movie.actors = req.body.actors;
+        movie.imageUrl = req.body.imageUrl || '';
         
         movie.save(function(err) {
             if (err) {
@@ -157,7 +175,7 @@ router.route('/movies')
 
 // Get movie by ID with optional reviews
 router.route('/movies/:id')
-    .get(function (req, res) {
+    .get(authJwtController.isAuthenticated, function (req, res) {
         var id = req.params.id;
         var includeReviews = req.query.reviews === 'true';
         
@@ -172,6 +190,11 @@ router.route('/movies/:id')
                         localField: '_id',
                         foreignField: 'movieId',
                         as: 'reviews'
+                    }
+                },
+                {
+                    $addFields: {
+                        avgRating: { $avg: '$reviews.rating' }
                     }
                 }
             ]).exec(function(err, movie) {
@@ -309,6 +332,58 @@ router.route('/reviews/:movieId')
                     res.json(reviews);
                 });
             }
+        });
+    });
+
+// Search movies by title or actor name
+router.route('/movies/search')
+    .post(authJwtController.isAuthenticated, function (req, res) {
+        if (!req.body.search) {
+            return res.status(400).json({ success: false, message: 'Please provide a search term' });
+        }
+        
+        const searchTerm = req.body.search;
+        const searchRegex = new RegExp(searchTerm, 'i');
+        
+        // Search by title or actor name
+        Movie.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { title: searchRegex },
+                        { 'actors.actorName': searchRegex }
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'reviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$reviews.rating' }
+                }
+            },
+            {
+                $sort: { avgRating: -1 }
+            }
+        ]).exec(function(err, movies) {
+            if (err) {
+                return res.status(500).send(err);
+            }
+            
+            // Track analytics for search
+            if (movies.length > 0) {
+                movies.forEach(movie => {
+                    analytics.trackMovie(movie, analytics.ACTION.SEARCH_MOVIES);
+                });
+            }
+            
+            res.json(movies);
         });
     });
 

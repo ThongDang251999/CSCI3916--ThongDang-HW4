@@ -39,6 +39,7 @@ const ACTION = {
     GET_REVIEWS: 'get_reviews',
     POST_REVIEWS: 'post_review',
     GET_MOVIE_REVIEWS: 'get_movie_reviews',
+    SEARCH_MOVIES: 'search_movies',
     RATING: 'Rating'
 };
 

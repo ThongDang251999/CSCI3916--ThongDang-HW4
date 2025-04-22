@@ -5,13 +5,14 @@ mongoose.connect(process.env.DB);
 
 // Movie schema
 var MovieSchema = new Schema({
-    title: { type: String, required: true },
-    releaseDate: { type: Number, required: true },
+    title: { type: String, required: true, index: true },
+    releaseDate: { type: Number, required: true, min: [1900, 'Must be greater than 1899'], max: [2100, 'Must be less than 2100'] },
     genre: { type: String, required: true },
     actors: [{ 
         actorName: { type: String, required: true },
         characterName: { type: String, required: true }
-    }]
+    }],
+    imageUrl: { type: String }
 });
 
 // return the model
