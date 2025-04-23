@@ -9,7 +9,7 @@ var ReviewSchema = new Schema({
     username: { type: String, required: true },
     review: { type: String, required: true },
     rating: { type: Number, min: 0, max: 5, required: true }
-});
+}, { timestamps: true });
 
 // return the model
 module.exports = mongoose.model('Review', ReviewSchema);

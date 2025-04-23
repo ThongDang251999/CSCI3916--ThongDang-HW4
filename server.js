@@ -106,10 +106,36 @@ router.route('/movies')
     .get(authJwtController.isAuthenticated, function (req, res) {
         // If reviews=true is in the query parameters, include reviews
         var includeReviews = req.query.reviews === 'true';
+        var searchTerm = req.query.search;
+        
+        // Start building the query
+        let query = {};
+        
+        // Add search functionality if search term is provided
+        if (searchTerm) {
+            const searchRegex = new RegExp(searchTerm, 'i');
+            query = {
+                $or: [
+                    { title: searchRegex },
+                    { genre: searchRegex },
+                    { 'actors.actorName': searchRegex },
+                    { 'actors.characterName': searchRegex }
+                ]
+            };
+        }
         
         if (includeReviews) {
             // Use aggregation to include reviews and calculate average rating
-            Movie.aggregate([
+            let aggregatePipeline = [];
+            
+            // If there's a search term, add a match stage
+            if (searchTerm) {
+                aggregatePipeline.push({ $match: query });
+            }
+            
+            // Add lookup and other stages
+            aggregatePipeline = [
+                ...aggregatePipeline,
                 {
                     $lookup: {
                         from: 'reviews',
@@ -126,7 +152,9 @@ router.route('/movies')
                 {
                     $sort: { avgRating: -1 } // Sort by average rating in descending order
                 }
-            ]).exec(function(err, movies) {
+            ];
+            
+            Movie.aggregate(aggregatePipeline).exec(function(err, movies) {
                 if (err) {
                     return res.status(500).send(err);
                 }
@@ -139,7 +167,7 @@ router.route('/movies')
                 res.json(movies);
             });
         } else {
-            Movie.find(function(err, movies) {
+            Movie.find(query, function(err, movies) {
                 if (err) {
                     return res.status(500).send(err);
                 }
@@ -208,7 +236,7 @@ router.route('/movies/:id')
                 // Track analytics for this movie
                 analytics.trackMovie(movie[0], analytics.ACTION.GET_MOVIE);
                 
-                res.json(movie[0]);
+                res.json(movie);
             });
         } else {
             Movie.findById(id, function(err, movie) {
@@ -231,7 +259,7 @@ router.route('/movies/:id')
 router.route('/reviews')
     .post(authJwtController.isAuthenticated, function (req, res) {
         if (!req.body.movieId || !req.body.review || req.body.rating === undefined) {
-            return res.json({ success: false, message: 'Please include movieId, review, and rating.'});
+            return res.status(400).json({ success: false, message: 'Please include movieId, review, and rating.'});
         }
         
         // First check if movie exists
@@ -246,7 +274,8 @@ router.route('/reviews')
             // Movie exists, so save the review
             var review = new Review();
             review.movieId = req.body.movieId;
-            review.username = req.user.username; // From JWT token
+            // Use username from request body if provided, otherwise use from JWT token
+            review.username = req.body.username || req.user.username;
             review.review = req.body.review;
             review.rating = req.body.rating;
             
@@ -258,7 +287,7 @@ router.route('/reviews')
                 // Track the review creation with analytics
                 analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
                 
-                res.json({ message: 'Review created!' });
+                res.json({ success: true, message: 'Review created!' });
             });
         });
     })
@@ -335,7 +364,7 @@ router.route('/reviews/:movieId')
         });
     });
 
-// Search movies by title or actor name
+// Search movies by title, genre, or actor name
 router.route('/movies/search')
     .post(authJwtController.isAuthenticated, function (req, res) {
         if (!req.body.search) {
@@ -345,13 +374,15 @@ router.route('/movies/search')
         const searchTerm = req.body.search;
         const searchRegex = new RegExp(searchTerm, 'i');
         
-        // Search by title or actor name
+        // Search by title, genre, or actor name
         Movie.aggregate([
             {
                 $match: {
                     $or: [
                         { title: searchRegex },
-                        { 'actors.actorName': searchRegex }
+                        { genre: searchRegex },
+                        { 'actors.actorName': searchRegex },
+                        { 'actors.characterName': searchRegex }
                     ]
                 }
             },
@@ -397,61 +428,29 @@ router.route('/analytics/test')
         });
 
         // Use the test movie name from query or default
-        const movieName = req.query.movie || "Test Movie";
-        const rating = req.query.rating || 5;
+        const testMovie = req.query.movie || 'Test Movie';
         
-        try {
-            // Send a test event
-            analytics.trackTest(movieName, rating)
-                .then(function(result) {
-                    console.log('Analytics test result:', result);
-                    res.status(200).json({
-                        success: true, 
-                        message: 'Analytics test endpoint accessed successfully.',
-                        details: {
-                            movie: movieName,
-                            rating: rating,
-                            timestamp: new Date().toISOString(),
-                            ga_key: process.env.GA_KEY,
-                            ga_secret_available: !!process.env.GA_SECRET,
-                            result: result
-                        }
-                    });
-                })
-                .catch(function(error) {
-                    console.error('Error in analytics test endpoint:', error);
-                    res.status(200).json({
-                        success: false,
-                        message: 'Analytics test completed with errors',
-                        details: {
-                            movie: movieName,
-                            rating: rating,
-                            timestamp: new Date().toISOString(),
-                            error: error.message || 'Unknown error',
-                            ga_key: process.env.GA_KEY,
-                            ga_secret_available: !!process.env.GA_SECRET
-                        }
-                    });
-                });
-        } catch (err) {
-            console.error('Exception in analytics test route:', err);
-            res.status(200).json({
-                success: false,
-                message: 'Analytics test completed with exception',
-                details: {
-                    movie: movieName,
-                    rating: rating,
-                    timestamp: new Date().toISOString(),
-                    error: err.message || 'Unknown error',
-                    ga_key: process.env.GA_KEY,
-                    ga_secret_available: !!process.env.GA_SECRET
-                }
-            });
-        }
+        // Create a fake movie and track it
+        const fakeMovie = { 
+            title: testMovie,
+            _id: '000000000000000000000000',
+            actors: []
+        };
+        
+        // Track a test event
+        analytics.trackMovie(fakeMovie, analytics.ACTION.GET_MOVIE);
+        
+        res.json({ 
+            success: true, 
+            message: 'Analytics test sent',
+            test_movie: testMovie,
+            ga_key: process.env.GA_KEY
+        });
     });
 
 app.use('/', router);
-app.listen(process.env.PORT || 8080);
-module.exports = app; // for testing only
+
+app.listen(process.env.PORT || 3001);
+console.log('Server is running on port ' + (process.env.PORT || 3001));
 
 
