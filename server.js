@@ -26,6 +26,27 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
+// Helper function for movie aggregation
+function aggregateMoviesWithReviews(match = {}, sort = { avgRating: -1 }) {
+    return [
+        { $match: match },
+        {
+            $lookup: {
+                from: 'reviews',
+                localField: '_id',
+                foreignField: 'movieId',
+                as: 'reviews'
+            }
+        },
+        {
+            $addFields: {
+                avgRating: { $avg: '$reviews.rating' }
+            }
+        },
+        { $sort: sort }
+    ];
+}
+
 // Enhanced CORS configuration
 app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
@@ -101,6 +122,45 @@ router.post('/signin', function (req, res) {
     })
 });
 
+// Search movies by title, genre, or actor name - PLACING THIS ROUTE FIRST FOR PROPER ROUTING
+router.route('/movies/search')
+    .post(authJwtController.isAuthenticated, function (req, res) {
+        if (!req.body.search) {
+            return res.status(400).json({ success: false, message: 'Please provide a search term' });
+        }
+        
+        const searchTerm = req.body.search;
+        const searchRegex = new RegExp(searchTerm, 'i');
+        
+        // Search query
+        const query = {
+            $or: [
+                { title: searchRegex },
+                { genre: searchRegex },
+                { 'actors.actorName': searchRegex },
+                { 'actors.characterName': searchRegex }
+            ]
+        };
+        
+        // Use the helper function for consistent aggregation
+        const pipeline = aggregateMoviesWithReviews(query);
+        
+        Movie.aggregate(pipeline).exec(function(err, movies) {
+            if (err) {
+                return res.status(500).send(err);
+            }
+            
+            // Track analytics for search
+            if (movies.length > 0) {
+                movies.forEach(movie => {
+                    analytics.trackMovie(movie, analytics.ACTION.SEARCH_MOVIES);
+                });
+            }
+            
+            res.json(movies);
+        });
+    });
+
 // Movie routes
 router.route('/movies')
     .get(authJwtController.isAuthenticated, function (req, res) {
@@ -125,36 +185,10 @@ router.route('/movies')
         }
         
         if (includeReviews) {
-            // Use aggregation to include reviews and calculate average rating
-            let aggregatePipeline = [];
+            // Use the helper function for aggregation
+            const pipeline = aggregateMoviesWithReviews(query);
             
-            // If there's a search term, add a match stage
-            if (searchTerm) {
-                aggregatePipeline.push({ $match: query });
-            }
-            
-            // Add lookup and other stages
-            aggregatePipeline = [
-                ...aggregatePipeline,
-                {
-                    $lookup: {
-                        from: 'reviews',
-                        localField: '_id',
-                        foreignField: 'movieId',
-                        as: 'reviews'
-                    }
-                },
-                {
-                    $addFields: {
-                        avgRating: { $avg: '$reviews.rating' }
-                    }
-                },
-                {
-                    $sort: { avgRating: -1 } // Sort by average rating in descending order
-                }
-            ];
-            
-            Movie.aggregate(aggregatePipeline).exec(function(err, movies) {
+            Movie.aggregate(pipeline).exec(function(err, movies) {
                 if (err) {
                     return res.status(500).send(err);
                 }
@@ -191,6 +225,7 @@ router.route('/movies')
         movie.releaseDate = req.body.releaseDate;
         movie.genre = req.body.genre;
         movie.actors = req.body.actors;
+        // Ensure imageUrl is set (even if it's empty string)
         movie.imageUrl = req.body.imageUrl || '';
         
         movie.save(function(err) {
@@ -208,24 +243,18 @@ router.route('/movies/:id')
         var includeReviews = req.query.reviews === 'true';
         
         if (includeReviews) {
-            Movie.aggregate([
-                { 
-                    $match: { _id: mongoose.Types.ObjectId(id) } 
-                },
-                {
-                    $lookup: {
-                        from: 'reviews',
-                        localField: '_id',
-                        foreignField: 'movieId',
-                        as: 'reviews'
-                    }
-                },
-                {
-                    $addFields: {
-                        avgRating: { $avg: '$reviews.rating' }
-                    }
-                }
-            ]).exec(function(err, movie) {
+            // Ensure we're using proper ObjectId conversion
+            let objectId;
+            try {
+                objectId = mongoose.Types.ObjectId(id);
+            } catch (e) {
+                return res.status(400).json({ success: false, message: 'Invalid movie ID format' });
+            }
+            
+            // Use helper function for aggregation
+            const pipeline = aggregateMoviesWithReviews({ _id: objectId });
+            
+            Movie.aggregate(pipeline).exec(function(err, movie) {
                 if (err) {
                     return res.status(500).send(err);
                 }
@@ -236,7 +265,7 @@ router.route('/movies/:id')
                 // Track analytics for this movie
                 analytics.trackMovie(movie[0], analytics.ACTION.GET_MOVIE);
                 
-                res.json(movie);
+                res.json(movie[0]); // Return just the movie object, not the array
             });
         } else {
             Movie.findById(id, function(err, movie) {
@@ -364,57 +393,41 @@ router.route('/reviews/:movieId')
         });
     });
 
-// Search movies by title, genre, or actor name
-router.route('/movies/search')
-    .post(authJwtController.isAuthenticated, function (req, res) {
-        if (!req.body.search) {
-            return res.status(400).json({ success: false, message: 'Please provide a search term' });
+// Add a dedicated endpoint for getting average rating
+router.route('/movies/:id/averagerating')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        var id = req.params.id;
+        
+        // Ensure we're using proper ObjectId conversion
+        let objectId;
+        try {
+            objectId = mongoose.Types.ObjectId(id);
+        } catch (e) {
+            return res.status(400).json({ success: false, message: 'Invalid movie ID format' });
         }
         
-        const searchTerm = req.body.search;
-        const searchRegex = new RegExp(searchTerm, 'i');
+        // Start with basic aggregation
+        const pipeline = aggregateMoviesWithReviews({ _id: objectId });
         
-        // Search by title, genre, or actor name
-        Movie.aggregate([
-            {
-                $match: {
-                    $or: [
-                        { title: searchRegex },
-                        { genre: searchRegex },
-                        { 'actors.actorName': searchRegex },
-                        { 'actors.characterName': searchRegex }
-                    ]
-                }
-            },
-            {
-                $lookup: {
-                    from: 'reviews',
-                    localField: '_id',
-                    foreignField: 'movieId',
-                    as: 'reviews'
-                }
-            },
-            {
-                $addFields: {
-                    avgRating: { $avg: '$reviews.rating' }
-                }
-            },
-            {
-                $sort: { avgRating: -1 }
+        // Add a project stage
+        pipeline.push({
+            $project: {
+                _id: 1,
+                title: 1,
+                avgRating: 1,
+                reviewCount: { $size: "$reviews" }
             }
-        ]).exec(function(err, movies) {
+        });
+        
+        Movie.aggregate(pipeline).exec(function(err, result) {
             if (err) {
                 return res.status(500).send(err);
             }
-            
-            // Track analytics for search
-            if (movies.length > 0) {
-                movies.forEach(movie => {
-                    analytics.trackMovie(movie, analytics.ACTION.SEARCH_MOVIES);
-                });
+            if (!result || result.length === 0) {
+                return res.status(404).json({ success: false, message: 'Movie not found' });
             }
             
-            res.json(movies);
+            res.json(result[0]);
         });
     });
 
@@ -445,6 +458,55 @@ router.route('/analytics/test')
             message: 'Analytics test sent',
             test_movie: testMovie,
             ga_key: process.env.GA_KEY
+        });
+    });
+
+// Explicit route for movies sorted by rating
+router.route('/movies/toprated')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        // Use the helper function for aggregation with empty query to get all movies
+        const pipeline = aggregateMoviesWithReviews({}, { avgRating: -1 });
+        
+        Movie.aggregate(pipeline).exec(function(err, movies) {
+            if (err) {
+                return res.status(500).send(err);
+            }
+            
+            // Track analytics for each movie
+            movies.forEach(movie => {
+                analytics.trackMovie(movie, analytics.ACTION.GET_MOVIES);
+            });
+            
+            res.json(movies);
+        });
+    });
+
+// Test endpoint for aggregation
+router.route('/test/aggregation')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        console.log('Testing aggregation functionality');
+        
+        // Use the helper function for consistent aggregation
+        const pipeline = aggregateMoviesWithReviews();
+        
+        Movie.aggregate(pipeline).exec(function(err, movies) {
+            if (err) {
+                console.error('Aggregation error:', err);
+                return res.status(500).json({ success: false, error: err.message });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Aggregation test completed',
+                count: movies.length,
+                movies: movies.map(m => ({
+                    _id: m._id,
+                    title: m.title,
+                    avgRating: m.avgRating,
+                    reviewCount: m.reviews.length,
+                    imageUrl: m.imageUrl
+                }))
+            });
         });
     });
 

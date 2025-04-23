@@ -117,3 +117,90 @@ The Google Analytics 4 property is configured with:
 
 As noted in the assignment instructions, GA4 events may take 24-48 hours to appear in reports.
 
+# Movie API Backend
+
+This is the backend API for the Movie Application (Assignment 5).
+
+## Requirements Implemented
+
+1. **JWT Auth Protected Routes**: All routes are protected with JWT authentication.
+2. **Movie model with imageUrl**: The Movie schema includes an imageUrl field.
+3. **Aggregation of Average Rating**: Using MongoDB's aggregation framework to compute average ratings.
+4. **/movies?reviews=true sorted by rating**: Endpoint returns movies sorted by average rating.
+5. **Movie detail endpoint with reviews**: Movie detail route includes reviews and aggregated ratings.
+6. **POST /movies/search**: Search functionality for finding movies by title, genre, or actor name.
+7. **Connected to MongoDB**: Using MongoDB for data storage.
+8. **Reviews.js and Users.js**: Database models for reviews and users are implemented.
+
+## API Endpoints
+
+### Authentication
+- `POST /signup` - Register a new user
+- `POST /signin` - Login to get a JWT token
+
+### Movies
+- `GET /movies` - Get all movies
+- `GET /movies?reviews=true` - Get all movies with reviews, sorted by rating
+- `GET /movies/toprated` - Get all movies sorted by average rating
+- `GET /movies/:id` - Get a specific movie by ID
+- `GET /movies/:id?reviews=true` - Get a specific movie with its reviews
+- `POST /movies` - Create a new movie
+- `POST /movies/search` - Search for movies by title, genre, or actor name
+
+### Reviews
+- `GET /reviews` - Get all reviews
+- `GET /reviews/:movieId` - Get reviews for a specific movie
+- `POST /reviews` - Add a new review for a movie
+
+### Testing/Debugging
+- `GET /test/aggregation` - Test the aggregation functionality
+- `GET /movies/:id/averagerating` - Get the average rating for a specific movie
+
+## How to Test Requirements
+
+### JWT Auth Protected Routes
+All routes are protected with JWT authentication. To test, try accessing protected routes without a token.
+
+### Movie Model with imageUrl
+When creating a movie, include an imageUrl field:
+
+```json
+{
+  "title": "Test Movie",
+  "releaseDate": 2022,
+  "genre": "Action",
+  "actors": [
+    {"actorName": "Actor 1", "characterName": "Character 1"},
+    {"actorName": "Actor 2", "characterName": "Character 2"},
+    {"actorName": "Actor 3", "characterName": "Character 3"}
+  ],
+  "imageUrl": "https://example.com/image.jpg"
+}
+```
+
+### Aggregation of Average Rating
+Test using the `/movies?reviews=true` endpoint or `/test/aggregation` endpoint.
+
+### Movies Sorted by Rating
+Use the `/movies?reviews=true` endpoint or the dedicated `/movies/toprated` endpoint.
+
+### Movie Detail with Reviews
+Use the `/movies/:id?reviews=true` endpoint to get a movie with its reviews and average rating.
+
+### Search Functionality
+Use the `/movies/search` endpoint with a POST request:
+
+```json
+{
+  "search": "search term"
+}
+```
+
+## Running the Server
+```
+npm install
+npm start
+```
+
+The server will run on port 3001 by default or the port specified in the environment variable.
+

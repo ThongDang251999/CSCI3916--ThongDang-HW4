@@ -12,7 +12,7 @@ var MovieSchema = new Schema({
         actorName: { type: String, required: true },
         characterName: { type: String, required: true }
     }],
-    imageUrl: { type: String }
+    imageUrl: { type: String, default: '' }
 });
 
 // return the model
