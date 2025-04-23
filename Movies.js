@@ -15,7 +15,7 @@ var MovieSchema = new Schema({
     releaseDate: { type: Number, required: true, min: [1900, 'Must be greater than 1899'], max: [2100, 'Must be less than 2100'] },
     genre: { type: String, required: true },
     actors: [ActorSchema],
-    imageUrl: String // Updated to match assignment requirements
+    imageUrl: { type: String, default: '' } // Explicitly formatted for Assignment 5
 });
 
 // return the model

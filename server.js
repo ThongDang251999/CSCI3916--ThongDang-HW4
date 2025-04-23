@@ -770,6 +770,388 @@ router.route('/assignment5/movies/:id')
         });
     });
 
+// Assignment 5 specific routes - completely separate implementation
+// Route to get all movies with reviews, sorted by rating
+router.route('/hw5/movies')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        console.log('Assignment 5 - Getting movies with reviews, sorted by rating');
+
+        // Exact MongoDB aggregation from assignment requirements
+        Movie.aggregate([
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'movieReviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$movieReviews.rating' }
+                }
+            },
+            {
+                $sort: { avgRating: -1 }
+            }
+        ]).exec(function(err, movies) {
+            if (err) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Error retrieving movies',
+                    error: err
+                });
+            }
+
+            res.json({ 
+                success: true, 
+                count: movies.length,
+                results: movies
+            });
+        });
+    });
+
+// Route to get a specific movie with reviews
+router.route('/hw5/movies/:id')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        console.log('Assignment 5 - Getting movie details with reviews');
+        
+        var movieId;
+        try {
+            movieId = mongoose.Types.ObjectId(req.params.id);
+        } catch (e) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid movie ID format'
+            });
+        }
+
+        // Exact MongoDB aggregation from assignment requirements
+        Movie.aggregate([
+            {
+                $match: { _id: movieId }
+            },
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'movieReviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$movieReviews.rating' }
+                }
+            }
+        ]).exec(function(err, result) {
+            if (err) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Error retrieving movie details',
+                    error: err
+                });
+            }
+
+            if (!result || result.length === 0) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Movie not found'
+                });
+            }
+
+            res.json({ 
+                success: true, 
+                result: result[0]
+            });
+        });
+    });
+
+// Route to add a review to a movie
+router.route('/hw5/reviews')
+    .post(authJwtController.isAuthenticated, function (req, res) {
+        console.log('Assignment 5 - Adding a review');
+        
+        if (!req.body.movieId || !req.body.review || req.body.rating === undefined) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Please include movieId, review, and rating' 
+            });
+        }
+
+        // Verify the movie exists first
+        Movie.findById(req.body.movieId, function(err, movie) {
+            if (err) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Error finding movie',
+                    error: err
+                });
+            }
+
+            if (!movie) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Movie not found'
+                });
+            }
+
+            // Create and save the review
+            var review = new Review();
+            review.movieId = req.body.movieId;
+            review.username = req.user.username; // Get username from JWT token
+            review.review = req.body.review;
+            review.rating = req.body.rating;
+
+            review.save(function(err) {
+                if (err) {
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Error saving review',
+                        error: err
+                    });
+                }
+
+                // Track the review creation with analytics
+                analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
+
+                res.json({ 
+                    success: true, 
+                    message: 'Review created!',
+                    review: review
+                });
+            });
+        });
+    });
+
+// Route to get all reviews for a movie
+router.route('/hw5/reviews/:movieId')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        console.log('Assignment 5 - Getting reviews for a movie');
+        
+        Review.find({ movieId: req.params.movieId }, function(err, reviews) {
+            if (err) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Error retrieving reviews',
+                    error: err
+                });
+            }
+
+            res.json({ 
+                success: true, 
+                count: reviews.length,
+                results: reviews
+            });
+        });
+    });
+
+// Extra credit: Search endpoint
+router.route('/hw5/search')
+    .post(authJwtController.isAuthenticated, function (req, res) {
+        console.log('Assignment 5 Extra Credit - Searching movies');
+        
+        if (!req.body.search) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Please provide a search term'
+            });
+        }
+
+        const searchTerm = req.body.search;
+        const searchRegex = new RegExp(searchTerm, 'i');
+
+        // Search using aggregation pipeline
+        Movie.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { title: searchRegex },
+                        { genre: searchRegex },
+                        { 'actors.actorName': searchRegex },
+                        { 'actors.characterName': searchRegex }
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'movieReviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$movieReviews.rating' }
+                }
+            },
+            {
+                $sort: { avgRating: -1 }
+            }
+        ]).exec(function(err, movies) {
+            if (err) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Error searching movies',
+                    error: err
+                });
+            }
+
+            res.json({ 
+                success: true, 
+                count: movies.length,
+                results: movies
+            });
+        });
+    });
+
+// Assignment 5 specific route to get movies with optional reviews parameter
+router.route('/hw5/movies-with-reviews')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        const includeReviews = req.query.reviews === 'true';
+        console.log(`Assignment 5 - Getting movies with reviews=${includeReviews}`);
+        
+        if (includeReviews) {
+            // When reviews=true, use the aggregation from the assignment
+            Movie.aggregate([
+                {
+                    $lookup: {
+                        from: 'reviews',
+                        localField: '_id',
+                        foreignField: 'movieId',
+                        as: 'movieReviews'
+                    }
+                },
+                {
+                    $addFields: {
+                        avgRating: { $avg: '$movieReviews.rating' }
+                    }
+                },
+                {
+                    $sort: { avgRating: -1 }
+                }
+            ]).exec(function(err, movies) {
+                if (err) {
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Error retrieving movies with reviews',
+                        error: err
+                    });
+                }
+                
+                res.json({ 
+                    success: true, 
+                    reviews: true,
+                    count: movies.length,
+                    results: movies
+                });
+            });
+        } else {
+            // When reviews=false or not specified, just return basic movie data
+            Movie.find({}, function(err, movies) {
+                if (err) {
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Error retrieving movies',
+                        error: err
+                    });
+                }
+                
+                res.json({ 
+                    success: true, 
+                    reviews: false,
+                    count: movies.length,
+                    results: movies
+                });
+            });
+        }
+    });
+
+// Assignment 5 specific route to get movie by ID with optional reviews parameter
+router.route('/hw5/movie-detail/:id')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        const includeReviews = req.query.reviews === 'true';
+        console.log(`Assignment 5 - Getting movie detail with reviews=${includeReviews}`);
+        
+        var movieId;
+        try {
+            movieId = mongoose.Types.ObjectId(req.params.id);
+        } catch (e) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid movie ID format'
+            });
+        }
+        
+        if (includeReviews) {
+            // When reviews=true, use the aggregation from the assignment
+            Movie.aggregate([
+                {
+                    $match: { _id: movieId }
+                },
+                {
+                    $lookup: {
+                        from: 'reviews',
+                        localField: '_id',
+                        foreignField: 'movieId',
+                        as: 'movieReviews'
+                    }
+                },
+                {
+                    $addFields: {
+                        avgRating: { $avg: '$movieReviews.rating' }
+                    }
+                }
+            ]).exec(function(err, result) {
+                if (err) {
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Error retrieving movie details with reviews',
+                        error: err
+                    });
+                }
+                
+                if (!result || result.length === 0) {
+                    return res.status(404).json({ 
+                        success: false, 
+                        message: 'Movie not found'
+                    });
+                }
+                
+                res.json({ 
+                    success: true, 
+                    reviews: true,
+                    result: result[0]
+                });
+            });
+        } else {
+            // When reviews=false or not specified, just return basic movie data
+            Movie.findById(movieId, function(err, movie) {
+                if (err) {
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Error retrieving movie details',
+                        error: err
+                    });
+                }
+                
+                if (!movie) {
+                    return res.status(404).json({ 
+                        success: false, 
+                        message: 'Movie not found'
+                    });
+                }
+                
+                res.json({ 
+                    success: true, 
+                    reviews: false,
+                    result: movie
+                });
+            });
+        }
+    });
+
 app.use('/', router);
 
 app.listen(process.env.PORT || 3001);
