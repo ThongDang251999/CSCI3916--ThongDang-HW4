@@ -364,7 +364,7 @@ router.route('/reviews')
             });
         });
     })
-    .get(function (req, res) {
+    .get(authJwtController.isAuthenticated, function (req, res) {
         Review.find(function(err, reviews) {
             if (err) {
                 return res.status(500).send(err);
@@ -404,7 +404,7 @@ router.route('/reviews')
 
 // Get reviews for a specific movie
 router.route('/reviews/:movieId')
-    .get(function (req, res) {
+    .get(authJwtController.isAuthenticated, function (req, res) {
         const movieId = req.params.movieId;
         
         // Find the movie first
