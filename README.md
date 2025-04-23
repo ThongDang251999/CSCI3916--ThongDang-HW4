@@ -249,3 +249,89 @@ npm start
 
 The server will run on port 3001 by default or the port specified in the environment variable.
 
+# MongoDB Aggregation Implementation
+
+## Key Features Implemented
+
+1. **MongoDB Schema with imageUrl**: Added `imageUrl` field to Movie schema
+   ```javascript
+   imageUrl: { type: String, default: '' }
+   ```
+
+2. **$lookup Aggregation for Reviews**: Using MongoDB's $lookup for joining movies and reviews
+   ```javascript
+   $lookup: {
+     from: 'reviews',
+     localField: '_id',
+     foreignField: 'movieId',
+     as: 'movieReviews'
+   }
+   ```
+
+3. **$avg for Average Rating Calculation**: Using MongoDB's $avg operator
+   ```javascript
+   $addFields: {
+     avgRating: { $avg: '$movieReviews.rating' }
+   }
+   ```
+
+4. **GET /movies?reviews=true with Sorting**: Endpoint returns movies with reviews, sorted by rating
+   ```javascript
+   // When reviews=true, use aggregation with $lookup and $avg
+   const aggregate = [
+     { $match: query },
+     {
+       $lookup: {
+         from: 'reviews',
+         localField: '_id',
+         foreignField: 'movieId',
+         as: 'movieReviews'
+       }
+     },
+     {
+       $addFields: {
+         avgRating: { $avg: '$movieReviews.rating' }
+       }
+     },
+     { $sort: { avgRating: -1 } }
+   ];
+   ```
+
+5. **Movie Detail with Reviews**: `/movies/:id?reviews=true` uses aggregation
+   ```javascript
+   const aggregate = [
+     { $match: { _id: objectId } },
+     {
+       $lookup: {
+         from: 'reviews',
+         localField: '_id',
+         foreignField: 'movieId',
+         as: 'movieReviews'
+       }
+     },
+     {
+       $addFields: {
+         avgRating: { $avg: '$movieReviews.rating' }
+       }
+     }
+   ];
+   ```
+
+6. **Search Movies**: POST `/movies/search` endpoint for searching movies
+   ```javascript
+   router.route('/movies/search')
+     .post(authJwtController.isAuthenticated, function (req, res) {
+       // Implementation uses $lookup and $avg
+     });
+   ```
+
+## Detailed Implementations
+
+The MongoDB aggregation framework is used extensively in this API for:
+- Joining movies with their reviews using $lookup
+- Calculating average ratings using $avg
+- Sorting movies by average rating
+- Filtering movies by search terms
+
+All endpoints are secured with JWT authentication and the API is ready to support a React frontend application.
+

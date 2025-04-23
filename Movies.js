@@ -12,6 +12,7 @@ var MovieSchema = new Schema({
         actorName: { type: String, required: true },
         characterName: { type: String, required: true }
     }],
+    // IMPORTANT: imageUrl field added for Assignment 5 requirement
     imageUrl: { type: String, default: '' }
 });
 

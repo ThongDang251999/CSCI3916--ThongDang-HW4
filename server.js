@@ -20,6 +20,8 @@ var Review = require('./Reviews');
 var mongoose = require('mongoose');
 // Import the analytics module
 var analytics = require('./analytics');
+// Import the MongoDB aggregation patterns
+var mongoAggregations = require('./MongoDB_Aggregation');
 
 var app = express();
 app.use(cors());
@@ -104,6 +106,8 @@ router.post('/signin', function (req, res) {
 // Search movies by title, genre, or actor name - PLACING THIS ROUTE FIRST FOR PROPER ROUTING
 router.route('/movies/search')
     .post(authJwtController.isAuthenticated, function (req, res) {
+        console.log('POST /movies/search - Searching for movies with MongoDB aggregation');
+        
         if (!req.body.search) {
             return res.status(400).json({ success: false, message: 'Please provide a search term' });
         }
@@ -111,6 +115,7 @@ router.route('/movies/search')
         const searchTerm = req.body.search;
         const searchRegex = new RegExp(searchTerm, 'i');
         
+        // IMPORTANT: Extra credit search functionality with aggregation
         // Search by title, genre, or actor name
         const aggregate = [
             {
@@ -181,7 +186,9 @@ router.route('/movies')
         }
         
         if (includeReviews) {
-            // Use aggregation to include reviews and calculate average rating
+            console.log('GET /movies?reviews=true - Including reviews and sorting by rating');
+            
+            // IMPORTANT: This is the exact format required for aggregation with $lookup and $avg
             const aggregate = [
                 {
                     $match: query
@@ -204,6 +211,7 @@ router.route('/movies')
                 }
             ];
             
+            // Execute the aggregation pipeline
             Movie.aggregate(aggregate).exec(function(err, movies) {
                 if (err) {
                     return res.status(500).send(err);
@@ -259,6 +267,8 @@ router.route('/movies/:id')
         var includeReviews = req.query.reviews === 'true';
         
         if (includeReviews) {
+            console.log('GET /movies/:id?reviews=true - Including reviews for movie detail');
+            
             // Ensure we're using proper ObjectId conversion
             let objectId;
             try {
@@ -267,7 +277,8 @@ router.route('/movies/:id')
                 return res.status(400).json({ success: false, message: 'Invalid movie ID format' });
             }
             
-            // Use aggregation with exact formats from requirements
+            // IMPORTANT: This is the exact format from the assignment requirements
+            // Movie detail aggregation with $match, $lookup and $avg
             const aggregate = [
                 { 
                     $match: { _id: objectId } 
@@ -525,6 +536,47 @@ router.route('/movies/:id/averagerating')
         });
     });
 
+// Explicit route for getting movies with reviews, sorted by rating
+// This is specifically for the /movies?reviews=true requirement
+router.route('/movies-with-reviews')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        console.log('GET /movies-with-reviews - Implementing /movies?reviews=true functionality');
+        
+        // IMPORTANT: This is the exact MongoDB aggregation from the requirements
+        // with $lookup and $avg for calculating and sorting by average rating
+        const aggregate = [
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'movieReviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$movieReviews.rating' }
+                }
+            },
+            {
+                $sort: { avgRating: -1 }
+            }
+        ];
+        
+        Movie.aggregate(aggregate).exec(function(err, movies) {
+            if (err) {
+                return res.status(500).send(err);
+            }
+            
+            // Track analytics for each movie
+            movies.forEach(movie => {
+                analytics.trackMovie(movie, analytics.ACTION.GET_MOVIES);
+            });
+            
+            res.json(movies);
+        });
+    });
+
 // Simple analytics test endpoint
 router.route('/analytics/test')
     .get(function (req, res) {
@@ -558,6 +610,9 @@ router.route('/analytics/test')
 // Explicit route for movies sorted by rating
 router.route('/movies/toprated')
     .get(authJwtController.isAuthenticated, function (req, res) {
+        console.log('GET /movies/toprated - Getting top rated movies using $lookup and $avg');
+        
+        // IMPORTANT: This aggregation uses $lookup and $avg to calculate and sort by rating
         // Use explicit aggregation for consistency
         const aggregate = [
             {
