@@ -26,27 +26,6 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// Helper function for movie aggregation
-function aggregateMoviesWithReviews(match = {}, sort = { avgRating: -1 }) {
-    return [
-        { $match: match },
-        {
-            $lookup: {
-                from: 'reviews',
-                localField: '_id',
-                foreignField: 'movieId',
-                as: 'reviews'
-            }
-        },
-        {
-            $addFields: {
-                avgRating: { $avg: '$reviews.rating' }
-            }
-        },
-        { $sort: sort }
-    ];
-}
-
 // Enhanced CORS configuration
 app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
@@ -132,20 +111,37 @@ router.route('/movies/search')
         const searchTerm = req.body.search;
         const searchRegex = new RegExp(searchTerm, 'i');
         
-        // Search query
-        const query = {
-            $or: [
-                { title: searchRegex },
-                { genre: searchRegex },
-                { 'actors.actorName': searchRegex },
-                { 'actors.characterName': searchRegex }
-            ]
-        };
+        // Search by title, genre, or actor name
+        const aggregate = [
+            {
+                $match: {
+                    $or: [
+                        { title: searchRegex },
+                        { genre: searchRegex },
+                        { 'actors.actorName': searchRegex },
+                        { 'actors.characterName': searchRegex }
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'movieReviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$movieReviews.rating' }
+                }
+            },
+            {
+                $sort: { avgRating: -1 }
+            }
+        ];
         
-        // Use the helper function for consistent aggregation
-        const pipeline = aggregateMoviesWithReviews(query);
-        
-        Movie.aggregate(pipeline).exec(function(err, movies) {
+        Movie.aggregate(aggregate).exec(function(err, movies) {
             if (err) {
                 return res.status(500).send(err);
             }
@@ -185,10 +181,30 @@ router.route('/movies')
         }
         
         if (includeReviews) {
-            // Use the helper function for aggregation
-            const pipeline = aggregateMoviesWithReviews(query);
+            // Use aggregation to include reviews and calculate average rating
+            const aggregate = [
+                {
+                    $match: query
+                },
+                {
+                    $lookup: {
+                        from: 'reviews',
+                        localField: '_id',
+                        foreignField: 'movieId',
+                        as: 'movieReviews'
+                    }
+                },
+                {
+                    $addFields: {
+                        avgRating: { $avg: '$movieReviews.rating' }
+                    }
+                },
+                {
+                    $sort: { avgRating: -1 } // Sort by average rating in descending order
+                }
+            ];
             
-            Movie.aggregate(pipeline).exec(function(err, movies) {
+            Movie.aggregate(aggregate).exec(function(err, movies) {
                 if (err) {
                     return res.status(500).send(err);
                 }
@@ -251,10 +267,27 @@ router.route('/movies/:id')
                 return res.status(400).json({ success: false, message: 'Invalid movie ID format' });
             }
             
-            // Use helper function for aggregation
-            const pipeline = aggregateMoviesWithReviews({ _id: objectId });
+            // Use aggregation with exact formats from requirements
+            const aggregate = [
+                { 
+                    $match: { _id: objectId } 
+                },
+                {
+                    $lookup: {
+                        from: 'reviews',
+                        localField: '_id',
+                        foreignField: 'movieId',
+                        as: 'movieReviews'
+                    }
+                },
+                {
+                    $addFields: {
+                        avgRating: { $avg: '$movieReviews.rating' }
+                    }
+                }
+            ];
             
-            Movie.aggregate(pipeline).exec(function(err, movie) {
+            Movie.aggregate(aggregate).exec(function(err, movie) {
                 if (err) {
                     return res.status(500).send(err);
                 }
@@ -393,6 +426,52 @@ router.route('/reviews/:movieId')
         });
     });
 
+// Test endpoint for aggregation
+router.route('/test/aggregation')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        console.log('Testing aggregation functionality');
+        
+        // Use explicit aggregation format for testing
+        const aggregate = [
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'movieReviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$movieReviews.rating' }
+                }
+            },
+            {
+                $sort: { avgRating: -1 }
+            }
+        ];
+        
+        Movie.aggregate(aggregate).exec(function(err, movies) {
+            if (err) {
+                console.error('Aggregation error:', err);
+                return res.status(500).json({ success: false, error: err.message });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Aggregation test completed',
+                count: movies.length,
+                movies: movies.map(m => ({
+                    _id: m._id,
+                    title: m.title,
+                    avgRating: m.avgRating,
+                    reviewCount: m.movieReviews.length,
+                    imageUrl: m.imageUrl
+                }))
+            });
+        });
+    });
+
 // Add a dedicated endpoint for getting average rating
 router.route('/movies/:id/averagerating')
     .get(authJwtController.isAuthenticated, function (req, res) {
@@ -406,20 +485,35 @@ router.route('/movies/:id/averagerating')
             return res.status(400).json({ success: false, message: 'Invalid movie ID format' });
         }
         
-        // Start with basic aggregation
-        const pipeline = aggregateMoviesWithReviews({ _id: objectId });
-        
-        // Add a project stage
-        pipeline.push({
-            $project: {
-                _id: 1,
-                title: 1,
-                avgRating: 1,
-                reviewCount: { $size: "$reviews" }
+        // Use explicit aggregation format
+        const aggregate = [
+            { 
+                $match: { _id: objectId } 
+            },
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'movieReviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$movieReviews.rating' }
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    title: 1,
+                    avgRating: 1,
+                    reviewCount: { $size: "$movieReviews" }
+                }
             }
-        });
+        ];
         
-        Movie.aggregate(pipeline).exec(function(err, result) {
+        Movie.aggregate(aggregate).exec(function(err, result) {
             if (err) {
                 return res.status(500).send(err);
             }
@@ -464,10 +558,27 @@ router.route('/analytics/test')
 // Explicit route for movies sorted by rating
 router.route('/movies/toprated')
     .get(authJwtController.isAuthenticated, function (req, res) {
-        // Use the helper function for aggregation with empty query to get all movies
-        const pipeline = aggregateMoviesWithReviews({}, { avgRating: -1 });
+        // Use explicit aggregation for consistency
+        const aggregate = [
+            {
+                $lookup: {
+                    from: 'reviews',
+                    localField: '_id',
+                    foreignField: 'movieId',
+                    as: 'movieReviews'
+                }
+            },
+            {
+                $addFields: {
+                    avgRating: { $avg: '$movieReviews.rating' }
+                }
+            },
+            {
+                $sort: { avgRating: -1 }
+            }
+        ];
         
-        Movie.aggregate(pipeline).exec(function(err, movies) {
+        Movie.aggregate(aggregate).exec(function(err, movies) {
             if (err) {
                 return res.status(500).send(err);
             }
@@ -478,35 +589,6 @@ router.route('/movies/toprated')
             });
             
             res.json(movies);
-        });
-    });
-
-// Test endpoint for aggregation
-router.route('/test/aggregation')
-    .get(authJwtController.isAuthenticated, function (req, res) {
-        console.log('Testing aggregation functionality');
-        
-        // Use the helper function for consistent aggregation
-        const pipeline = aggregateMoviesWithReviews();
-        
-        Movie.aggregate(pipeline).exec(function(err, movies) {
-            if (err) {
-                console.error('Aggregation error:', err);
-                return res.status(500).json({ success: false, error: err.message });
-            }
-            
-            res.json({
-                success: true,
-                message: 'Aggregation test completed',
-                count: movies.length,
-                movies: movies.map(m => ({
-                    _id: m._id,
-                    title: m.title,
-                    avgRating: m.avgRating,
-                    reviewCount: m.reviews.length,
-                    imageUrl: m.imageUrl
-                }))
-            });
         });
     });
 

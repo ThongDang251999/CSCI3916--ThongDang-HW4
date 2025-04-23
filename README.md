@@ -124,10 +124,10 @@ This is the backend API for the Movie Application (Assignment 5).
 ## Requirements Implemented
 
 1. **JWT Auth Protected Routes**: All routes are protected with JWT authentication.
-2. **Movie model with imageUrl**: The Movie schema includes an imageUrl field.
-3. **Aggregation of Average Rating**: Using MongoDB's aggregation framework to compute average ratings.
-4. **/movies?reviews=true sorted by rating**: Endpoint returns movies sorted by average rating.
-5. **Movie detail endpoint with reviews**: Movie detail route includes reviews and aggregated ratings.
+2. **Movie model with imageUrl**: The Movie schema includes an imageUrl field with default value.
+3. **Aggregation of Average Rating**: Using MongoDB's $lookup and $avg for calculating average ratings.
+4. **/movies?reviews=true sorted by rating**: Endpoint returns movies with reviews, sorted by average rating.
+5. **Movie detail endpoint with reviews**: Movie detail route includes reviews and aggregated ratings using $lookup.
 6. **POST /movies/search**: Search functionality for finding movies by title, genre, or actor name.
 7. **Connected to MongoDB**: Using MongoDB for data storage.
 8. **Reviews.js and Users.js**: Database models for reviews and users are implemented.
@@ -179,13 +179,13 @@ When creating a movie, include an imageUrl field:
 ```
 
 ### Aggregation of Average Rating
-Test using the `/movies?reviews=true` endpoint or `/test/aggregation` endpoint.
+Test using the `/movies?reviews=true` endpoint which uses MongoDB's $lookup and $avg to calculate ratings.
 
 ### Movies Sorted by Rating
-Use the `/movies?reviews=true` endpoint or the dedicated `/movies/toprated` endpoint.
+Use the `/movies?reviews=true` endpoint which returns movies sorted by average rating in descending order.
 
 ### Movie Detail with Reviews
-Use the `/movies/:id?reviews=true` endpoint to get a movie with its reviews and average rating.
+Use the `/movies/:id?reviews=true` endpoint which uses $match and $lookup to get a movie with its reviews.
 
 ### Search Functionality
 Use the `/movies/search` endpoint with a POST request:
@@ -194,6 +194,51 @@ Use the `/movies/search` endpoint with a POST request:
 {
   "search": "search term"
 }
+```
+
+## Implementation Details
+
+### Aggregation in Movies Endpoint
+The `/movies?reviews=true` endpoint uses the following aggregation pipeline:
+```js
+[
+  { $match: query },
+  {
+    $lookup: {
+      from: 'reviews',
+      localField: '_id',
+      foreignField: 'movieId',
+      as: 'movieReviews'
+    }
+  },
+  {
+    $addFields: {
+      avgRating: { $avg: '$movieReviews.rating' }
+    }
+  },
+  { $sort: { avgRating: -1 } }
+]
+```
+
+### Movie Detail Aggregation
+The `/movies/:id?reviews=true` endpoint uses:
+```js
+[
+  { $match: { _id: objectId } },
+  {
+    $lookup: {
+      from: 'reviews',
+      localField: '_id',
+      foreignField: 'movieId',
+      as: 'movieReviews'
+    }
+  },
+  {
+    $addFields: {
+      avgRating: { $avg: '$movieReviews.rating' }
+    }
+  }
+]
 ```
 
 ## Running the Server
