@@ -1,7 +1,6 @@
 // Simple analytics implementation using GA4 Measurement Protocol
 const crypto = require('crypto');
 const axios = require('axios');
-const request = require('axios');
 
 const GA4_MEASUREMENT_ID = process.env.GA_KEY || 'G-B1QLX7WMCE';
 const GA4_API_SECRET = process.env.GA_SECRET;

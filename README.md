@@ -1,3 +1,77 @@
+# CSC3916 Assignment 4 - Movie API
+
+This repository contains a RESTful API for managing movies and reviews. It supports user authentication, movie CRUD operations, reviews, and analytics tracking.
+
+## Features
+
+- User authentication with JWT
+- Movie management with CRUD operations
+- Review system for movies
+- Analytics tracking with Google Analytics
+- Aggregation of movies and reviews data
+
+## Environment Variables
+
+To run this application, you need to set up the following environment variables:
+
+- `DB` - MongoDB connection string
+- `SECRET_KEY` - Secret key for JWT token generation
+- `GA_KEY` - Google Analytics Measurement ID
+- `GA_SECRET` - Google Analytics API Secret
+- `PORT` - (Optional) Port to run the server on
+
+## Deployment Instructions for Render
+
+1. Fork/clone this repository
+2. Create a new Web Service in Render
+3. Connect your GitHub repository
+4. Configure the following settings:
+   - Build Command: `npm install`
+   - Start Command: `node server.js`
+   - Node.js version: 18.x
+5. Add the environment variables:
+   - Go to "Environment" tab
+   - Add all required environment variables (DB, SECRET_KEY, GA_KEY, GA_SECRET)
+6. Deploy the application
+
+## API Endpoints
+
+### Authentication
+- `POST /signup` - Register a new user
+- `POST /signin` - Log in a user and get JWT token
+
+### Movies
+- `GET /movies` - Get all movies
+- `GET /movies?reviews=true` - Get all movies with reviews, sorted by rating
+- `GET /movies/:id` - Get a specific movie
+- `GET /movies/:id?reviews=true` - Get a specific movie with its reviews
+- `POST /movies` - Create a new movie (JWT required)
+- `POST /movies/search` - Search for movies (JWT required)
+
+### Reviews
+- `GET /reviews` - Get all reviews (JWT required)
+- `GET /reviews/:movieId` - Get reviews for a specific movie (JWT required)
+- `POST /reviews` - Create a new review (JWT required)
+
+### Analytics
+- `GET /analytics/test` - Test GA4 analytics
+- `GET /analytics/ua-test` - Test Universal Analytics
+
+## Testing
+
+Run tests with:
+```
+npm test
+```
+
+## License
+
+MIT
+
+## Author
+
+Original by Shawn McCarthy, modified by Thong Dang
+
 # Assignment Four
 ## Purpose
 The purpose of this assignment is to leverage Google's analytics policies to gather information about the requests being sent in by users.

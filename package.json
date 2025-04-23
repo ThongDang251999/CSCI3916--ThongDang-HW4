@@ -4,10 +4,11 @@
   "description": "Web API 3916 Homework 3",
   "main": "server.js",
   "engines": {
-    "node": "16.x"
+    "node": "18.x"
   },
   "scripts": {
-    "test": "mocha --timeout 10000 --exit"
+    "test": "mocha --timeout 10000 --exit",
+    "start": "node server.js"
   },
   "repository": {
     "type": "git",
