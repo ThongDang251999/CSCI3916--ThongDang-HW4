@@ -607,6 +607,41 @@ router.route('/analytics/test')
         });
     });
 
+// Add a classic Universal Analytics test endpoint
+router.route('/analytics/ua-test')
+    .get(function (req, res) {
+        console.log('Universal Analytics test endpoint called');
+        
+        // Use the movie name and rating from query parameters or defaults
+        const movieName = req.query.movie || 'Test Movie';
+        const rating = parseInt(req.query.rating) || 5;
+        const genre = req.query.genre || 'Comedy';
+        
+        // Track with the universal analytics format
+        analytics.trackDimension(
+            genre,                     // Category: Genre of Movie
+            'ua-test',                 // Action: URL Path 
+            analytics.LABEL.FEEDBACK,  // Label: API Request for Movie Review
+            rating,                    // Value: rating value
+            movieName,                 // Dimension: Movie Name
+            1                          // Metric: Requested Value 1
+        ).then(function (response) {
+            res.json({
+                success: true,
+                message: 'Universal Analytics event tracked',
+                movie: movieName,
+                rating: rating,
+                genre: genre
+            });
+        }).catch(function (error) {
+            res.json({
+                success: false,
+                message: 'Error tracking Universal Analytics event',
+                error: error.message
+            });
+        });
+    });
+
 // Explicit route for movies sorted by rating
 router.route('/movies/toprated')
     .get(authJwtController.isAuthenticated, function (req, res) {
