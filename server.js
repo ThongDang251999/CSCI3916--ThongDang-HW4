@@ -1152,6 +1152,105 @@ router.route('/hw5/movie-detail/:id')
         }
     });
 
+// Temporary route to check for Guardians of the Galaxy movie
+router.route('/check-guardians')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        Movie.findOne({ title: /guardians/i }, function(err, movie) {
+            if (err) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Error checking for movie',
+                    error: err
+                });
+            }
+            
+            if (!movie) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Guardians of the Galaxy movie not found. You need to add it to the database.'
+                });
+            }
+            
+            res.json({ 
+                success: true, 
+                message: 'Guardians of the Galaxy movie found!',
+                movie: movie
+            });
+        });
+    });
+
+// Temporary route to add Guardians of the Galaxy movie with poster image
+router.route('/add-guardians')
+    .get(authJwtController.isAuthenticated, function (req, res) {
+        // First check if it already exists
+        Movie.findOne({ title: /guardians/i }, function(err, existingMovie) {
+            if (err) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Error checking for existing movie',
+                    error: err
+                });
+            }
+            
+            if (existingMovie) {
+                // Update the imageUrl if it exists but doesn't have the proper image URL
+                if (!existingMovie.imageUrl || existingMovie.imageUrl === '') {
+                    existingMovie.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
+                    
+                    existingMovie.save(function(err) {
+                        if (err) {
+                            return res.status(500).json({ 
+                                success: false, 
+                                message: 'Error updating movie image URL',
+                                error: err
+                            });
+                        }
+                        
+                        return res.json({ 
+                            success: true, 
+                            message: 'Guardians of the Galaxy movie updated with poster image!',
+                            movie: existingMovie
+                        });
+                    });
+                } else {
+                    return res.json({ 
+                        success: true, 
+                        message: 'Guardians of the Galaxy movie already exists with an image URL!',
+                        movie: existingMovie
+                    });
+                }
+            } else {
+                // Create new Guardians of the Galaxy movie
+                var guardians = new Movie();
+                guardians.title = 'Guardians of the Galaxy';
+                guardians.releaseDate = 2014;
+                guardians.genre = 'Action, Adventure, Comedy';
+                guardians.actors = [
+                    { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
+                    { actorName: 'Zoe Saldana', characterName: 'Gamora' },
+                    { actorName: 'Dave Bautista', characterName: 'Drax' }
+                ];
+                guardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
+                
+                guardians.save(function(err) {
+                    if (err) {
+                        return res.status(500).json({ 
+                            success: false, 
+                            message: 'Error creating Guardians of the Galaxy movie',
+                            error: err
+                        });
+                    }
+                    
+                    res.json({ 
+                        success: true, 
+                        message: 'Guardians of the Galaxy movie created with poster image!',
+                        movie: guardians
+                    });
+                });
+            }
+        });
+    });
+
 app.use('/', router);
 
 app.listen(process.env.PORT || 3001);
