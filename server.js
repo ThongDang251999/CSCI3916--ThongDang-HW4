@@ -371,17 +371,42 @@ router.route('/movies/:id')
 // Review routes
 router.route('/reviews')
     .post(authJwtController.isAuthenticated, function (req, res) {
+        console.log('Review submission attempt:', req.body);
+        
         if (!req.body.movieId || !req.body.review || req.body.rating === undefined) {
-            return res.status(400).json({ success: false, message: 'Please include movieId, review, and rating.'});
+            console.log('Missing required fields:', {
+                hasMovieId: !!req.body.movieId,
+                hasReview: !!req.body.review,
+                hasRating: req.body.rating !== undefined
+            });
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Please include movieId, review, and rating.',
+                missing: {
+                    movieId: !req.body.movieId,
+                    review: !req.body.review,
+                    rating: req.body.rating === undefined
+                }
+            });
         }
         
         // First check if movie exists
         Movie.findById(req.body.movieId, function(err, movie) {
             if (err) {
-                return res.status(500).send(err);
+                console.log('Error finding movie:', err);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Error finding movie',
+                    error: err.message
+                });
             }
+            
             if (!movie) {
-                return res.status(404).json({ success: false, message: 'Movie not found' });
+                console.log('Movie not found, ID:', req.body.movieId);
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Movie not found'
+                });
             }
             
             // Movie exists, so save the review
@@ -392,15 +417,27 @@ router.route('/reviews')
             review.review = req.body.review;
             review.rating = req.body.rating;
             
+            console.log('Saving review:', review);
+            
             review.save(function(err) {
                 if (err) {
-                    return res.status(500).send(err);
+                    console.log('Error saving review:', err);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Error saving review',
+                        error: err.message
+                    });
                 }
                 
                 // Track the review creation with analytics
                 analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
                 
-                res.json({ success: true, message: 'Review created!' });
+                console.log('Review saved successfully');
+                res.json({ 
+                    success: true, 
+                    message: 'Review created!',
+                    review: review
+                });
             });
         });
     })
@@ -870,26 +907,38 @@ router.route('/hw5/movies/:id')
 // Route to add a review to a movie
 router.route('/hw5/reviews')
     .post(authJwtController.isAuthenticated, function (req, res) {
-        console.log('Assignment 5 - Adding a review');
+        console.log('Assignment 5 - Adding a review - Request body:', req.body);
         
         if (!req.body.movieId || !req.body.review || req.body.rating === undefined) {
+            console.log('Missing required fields:', {
+                hasMovieId: !!req.body.movieId,
+                hasReview: !!req.body.review,
+                hasRating: req.body.rating !== undefined
+            });
             return res.status(400).json({ 
                 success: false, 
-                message: 'Please include movieId, review, and rating' 
+                message: 'Please include movieId, review, and rating',
+                missing: {
+                    movieId: !req.body.movieId,
+                    review: !req.body.review,
+                    rating: req.body.rating === undefined
+                }
             });
         }
 
         // Verify the movie exists first
         Movie.findById(req.body.movieId, function(err, movie) {
             if (err) {
+                console.log('Error finding movie:', err);
                 return res.status(500).json({ 
                     success: false, 
                     message: 'Error finding movie',
-                    error: err
+                    error: err.message
                 });
             }
 
             if (!movie) {
+                console.log('Movie not found, ID:', req.body.movieId);
                 return res.status(404).json({ 
                     success: false, 
                     message: 'Movie not found'
@@ -903,18 +952,27 @@ router.route('/hw5/reviews')
             review.review = req.body.review;
             review.rating = req.body.rating;
 
+            console.log('About to save review:', {
+                movieId: review.movieId,
+                username: review.username,
+                review: review.review,
+                rating: review.rating
+            });
+
             review.save(function(err) {
                 if (err) {
+                    console.log('Error saving review:', err);
                     return res.status(500).json({ 
                         success: false, 
                         message: 'Error saving review',
-                        error: err
+                        error: err.message
                     });
                 }
 
                 // Track the review creation with analytics
                 analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
 
+                console.log('Review saved successfully');
                 res.json({ 
                     success: true, 
                     message: 'Review created!',
