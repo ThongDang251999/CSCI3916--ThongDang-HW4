@@ -548,9 +548,14 @@ router.route('/reviews')
                 review.review = req.body.review;
                 review.rating = req.body.rating;
                 
-                console.log('Saving test-movie review for movie:', movie.title);
+                console.log('Saving test-movie review for movie:', movie.title, 'ID:', movie._id.toString());
+                console.log('Review details:', {
+                    username: review.username,
+                    review: review.review,
+                    rating: review.rating
+                });
                 
-                review.save(function(err) {
+                review.save(function(err, savedReview) {
                     if (err) {
                         console.log('Error saving test-movie review:', err);
                         return res.status(500).json({ 
@@ -563,11 +568,17 @@ router.route('/reviews')
                     // Track the review
                     analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
                     
-                    console.log('Test-movie review saved successfully');
+                    console.log('Test-movie review saved successfully with ID:', savedReview._id.toString());
                     res.json({ 
                         success: true, 
                         message: 'Review created!',
-                        review: review
+                        review: {
+                            _id: savedReview._id,
+                            movieId: savedReview.movieId,
+                            username: savedReview.username,
+                            review: savedReview.review,
+                            rating: savedReview.rating
+                        }
                     });
                 });
             }
@@ -1141,9 +1152,14 @@ router.route('/hw5/reviews')
                 review.review = req.body.review;
                 review.rating = req.body.rating;
                 
-                console.log('Saving test-movie review for movie:', movie.title);
+                console.log('Saving test-movie review for movie:', movie.title, 'ID:', movie._id.toString());
+                console.log('Review details:', {
+                    username: review.username,
+                    review: review.review,
+                    rating: review.rating
+                });
                 
-                review.save(function(err) {
+                review.save(function(err, savedReview) {
                     if (err) {
                         console.log('Error saving test-movie review:', err);
                         return res.status(500).json({ 
@@ -1156,11 +1172,17 @@ router.route('/hw5/reviews')
                     // Track the review
                     analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
                     
-                    console.log('Test-movie review saved successfully');
+                    console.log('Test-movie review saved successfully with ID:', savedReview._id.toString());
                     res.json({ 
                         success: true, 
                         message: 'Review created!',
-                        review: review
+                        review: {
+                            _id: savedReview._id,
+                            movieId: savedReview.movieId,
+                            username: savedReview.username,
+                            review: savedReview.review,
+                            rating: savedReview.rating
+                        }
                     });
                 });
             }
@@ -1667,6 +1689,117 @@ router.route('/movies/test-movie')
                 console.log('Returning test-movie without reviews');
                 res.json(movie);
             }
+        }
+    });
+
+// Diagnostic endpoint to check all reviews
+router.route('/diagnostic/check-reviews')
+    .get(function (req, res) {
+        console.log('Diagnostic: Checking all reviews in database');
+        
+        Review.find({})
+            .sort({ _id: -1 }) // Get newest first
+            .limit(20)
+            .exec(function(err, reviews) {
+                if (err) {
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Error retrieving reviews',
+                        error: err.message
+                    });
+                }
+                
+                if (!reviews || reviews.length === 0) {
+                    return res.json({
+                        success: true,
+                        message: 'No reviews found in database',
+                        count: 0,
+                        reviews: []
+                    });
+                }
+                
+                // If reviews exist, get the corresponding movie titles
+                const movieIds = [...new Set(reviews.map(r => r.movieId))];
+                
+                Movie.find({ '_id': { $in: movieIds } }, function(err, movies) {
+                    const movieMap = {};
+                    if (movies) {
+                        movies.forEach(m => {
+                            movieMap[m._id] = m.title;
+                        });
+                    }
+                    
+                    // Add movie titles to reviews
+                    const reviewsWithMovieTitles = reviews.map(r => ({
+                        _id: r._id,
+                        movieId: r.movieId,
+                        movieTitle: movieMap[r.movieId] || 'Unknown Movie',
+                        username: r.username,
+                        review: r.review,
+                        rating: r.rating,
+                        date: r._id.getTimestamp()
+                    }));
+                    
+                    res.json({
+                        success: true,
+                        message: 'Reviews retrieved successfully',
+                        count: reviews.length,
+                        reviews: reviewsWithMovieTitles
+                    });
+                });
+            });
+    });
+
+// Diagnostic endpoint to check test-movie reviews
+router.route('/diagnostic/test-movie-reviews')
+    .get(function (req, res) {
+        console.log('Diagnostic: Checking test-movie reviews');
+        
+        // Find Guardians of the Galaxy or any movie
+        Movie.findOne({ title: /guardians/i }, function(err, movie) {
+            if (err || !movie) {
+                Movie.findOne({}, function(err, fallbackMovie) {
+                    if (err || !fallbackMovie) {
+                        return res.status(404).json({ 
+                            success: false, 
+                            message: 'No movies found in database'
+                        });
+                    }
+                    checkReviewsForMovie(fallbackMovie);
+                });
+            } else {
+                checkReviewsForMovie(movie);
+            }
+        });
+        
+        function checkReviewsForMovie(movie) {
+            console.log('Checking reviews for movie:', movie.title, 'ID:', movie._id);
+            
+            Review.find({ movieId: movie._id })
+                .sort({ _id: -1 }) // Get newest first
+                .exec(function(err, reviews) {
+                    if (err) {
+                        return res.status(500).json({ 
+                            success: false, 
+                            message: 'Error retrieving reviews',
+                            error: err.message
+                        });
+                    }
+                    
+                    res.json({
+                        success: true,
+                        message: `Reviews for ${movie.title}`,
+                        movieId: movie._id,
+                        count: reviews.length,
+                        reviews: reviews.map(r => ({
+                            _id: r._id,
+                            username: r.username,
+                            review: r.review,
+                            rating: r.rating,
+                            date: r._id.getTimestamp()
+                        }))
+                    });
+                });
         }
     });
 
