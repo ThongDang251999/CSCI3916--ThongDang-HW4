@@ -59,9 +59,7 @@ Movie.deleteMany({ title: 'Test Movie HW4' }).exec()
                 actors: [
                     { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                     { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                    { actorName: 'Vin Diesel', characterName: 'Groot' },
-                    { actorName: 'Dave Bautista', characterName: 'Drax' },
-                    { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                    { actorName: 'Vin Diesel', characterName: 'Groot' }
                 ],
                 imageUrl: 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg'
             });
@@ -436,9 +434,7 @@ router.route('/movies')
             movie.actors = [
                 { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                 { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                { actorName: 'Vin Diesel', characterName: 'Groot' },
-                { actorName: 'Dave Bautista', characterName: 'Drax' },
-                { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                { actorName: 'Vin Diesel', characterName: 'Groot' }
             ];
             movie.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
         } else {
@@ -481,9 +477,7 @@ router.route('/movies/:id')
                     newGuardians.actors = [
                         { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                         { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                        { actorName: 'Vin Diesel', characterName: 'Groot' },
-                        { actorName: 'Dave Bautista', characterName: 'Drax' },
-                        { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                        { actorName: 'Vin Diesel', characterName: 'Groot' }
                     ];
                     newGuardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
                     
@@ -634,9 +628,7 @@ router.route('/reviews')
                     newGuardians.actors = [
                         { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                         { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                        { actorName: 'Vin Diesel', characterName: 'Groot' },
-                        { actorName: 'Dave Bautista', characterName: 'Drax' },
-                        { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                        { actorName: 'Vin Diesel', characterName: 'Groot' }
                     ];
                     newGuardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
                     
@@ -994,9 +986,7 @@ router.route('/guardians')
                 newGuardians.actors = [
                     { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                     { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                    { actorName: 'Vin Diesel', characterName: 'Groot' },
-                    { actorName: 'Dave Bautista', characterName: 'Drax' },
-                    { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                    { actorName: 'Vin Diesel', characterName: 'Groot' }
                 ];
                 newGuardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
                 
@@ -1391,9 +1381,7 @@ router.route('/hw5/reviews')
                     newGuardians.actors = [
                         { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                         { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                        { actorName: 'Vin Diesel', characterName: 'Groot' },
-                        { actorName: 'Dave Bautista', characterName: 'Drax' },
-                        { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                        { actorName: 'Vin Diesel', characterName: 'Groot' }
                     ];
                     newGuardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
                     
@@ -1692,9 +1680,7 @@ router.route('/hw5/movie-detail/:id')
                     newGuardians.actors = [
                         { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                         { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                        { actorName: 'Vin Diesel', characterName: 'Groot' },
-                        { actorName: 'Dave Bautista', characterName: 'Drax' },
-                        { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                        { actorName: 'Vin Diesel', characterName: 'Groot' }
                     ];
                     newGuardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
                     
@@ -1908,9 +1894,7 @@ router.route('/add-guardians')
                 guardians.actors = [
                     { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                     { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                    { actorName: 'Vin Diesel', characterName: 'Groot' },
-                    { actorName: 'Dave Bautista', characterName: 'Drax' },
-                    { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                    { actorName: 'Vin Diesel', characterName: 'Groot' }
                 ];
                 guardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
                 
@@ -1949,9 +1933,7 @@ router.route('/movies/test-movie')
                 newGuardians.actors = [
                     { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                     { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                    { actorName: 'Vin Diesel', characterName: 'Groot' },
-                    { actorName: 'Dave Bautista', characterName: 'Drax' },
-                    { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                    { actorName: 'Vin Diesel', characterName: 'Groot' }
                 ];
                 newGuardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
                 
@@ -2198,9 +2180,7 @@ router.route('/setup-guardians-reviews')
                 newGuardians.actors = [
                     { actorName: 'Chris Pratt', characterName: 'Peter Quill' },
                     { actorName: 'Zoe Saldana', characterName: 'Gamora' },
-                    { actorName: 'Vin Diesel', characterName: 'Groot' },
-                    { actorName: 'Dave Bautista', characterName: 'Drax' },
-                    { actorName: 'Bradley Cooper', characterName: 'Rocket' }
+                    { actorName: 'Vin Diesel', characterName: 'Groot' }
                 ];
                 newGuardians.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
                 
