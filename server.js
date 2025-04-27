@@ -1449,23 +1449,39 @@ router.route('/hw5/reviews')
                                         console.log('Error updating movie average rating:', err);
                                     } else {
                                         console.log('Movie average rating updated to:', updatedMovie.avgRating);
+                                        
+                                        // Get the updated movie with all its details
+                                        Movie.findById(updatedMovie._id)
+                                            .populate('reviews')
+                                            .exec(function(err, fullMovie) {
+                                                if (err) {
+                                                    console.log('Error fetching updated movie:', err);
+                                                }
+                                                
+                                                console.log('Test-movie review saved successfully with ID:', savedReview._id.toString());
+                                                res.json({ 
+                                                    success: true, 
+                                                    message: 'Review created!',
+                                                    review: {
+                                                        _id: savedReview._id,
+                                                        movieId: savedReview.movieId,
+                                                        username: savedReview.username,
+                                                        review: savedReview.review,
+                                                        rating: savedReview.rating
+                                                    },
+                                                    movie: {
+                                                        _id: fullMovie._id,
+                                                        title: fullMovie.title,
+                                                        year: fullMovie.year,
+                                                        avgRating: fullMovie.avgRating,
+                                                        numReviews: fullMovie.reviews ? fullMovie.reviews.length : 0
+                                                    }
+                                                });
+                                            });
                                     }
                                 }
                             );
                         }
-                        
-                        console.log('Test-movie review saved successfully with ID:', savedReview._id.toString());
-                        res.json({ 
-                            success: true, 
-                            message: 'Review created!',
-                            review: {
-                                _id: savedReview._id,
-                                movieId: savedReview.movieId,
-                                username: savedReview.username,
-                                review: savedReview.review,
-                                rating: savedReview.rating
-                            }
-                        });
                     });
                 });
             }
@@ -1540,17 +1556,33 @@ router.route('/hw5/reviews')
                                     console.log('Error updating movie average rating:', err);
                                 } else {
                                     console.log('Movie average rating updated to:', updatedMovie.avgRating);
+                                    
+                                    // Get the updated movie with all its details
+                                    Movie.findById(updatedMovie._id)
+                                        .populate('reviews')
+                                        .exec(function(err, fullMovie) {
+                                            if (err) {
+                                                console.log('Error fetching updated movie:', err);
+                                            }
+                                            
+                                            console.log('Review saved successfully');
+                                            res.json({ 
+                                                success: true, 
+                                                message: 'Review created!',
+                                                review: review,
+                                                movie: {
+                                                    _id: fullMovie._id,
+                                                    title: fullMovie.title,
+                                                    year: fullMovie.year,
+                                                    avgRating: fullMovie.avgRating,
+                                                    numReviews: fullMovie.reviews ? fullMovie.reviews.length : 0
+                                                }
+                                            });
+                                        });
                                 }
                             }
                         );
                     }
-                    
-                    console.log('Review saved successfully');
-                    res.json({ 
-                        success: true, 
-                        message: 'Review created!',
-                        review: review
-                    });
                 });
             });
         });
