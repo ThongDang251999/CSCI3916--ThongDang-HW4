@@ -1242,50 +1242,55 @@ router.route('/assignment5/movies/:id')
 
 // Route to get all movies with reviews, sorted by rating
 router.route('/hw5/movies')
-    .get(authJwtController.isAuthenticated, function (req, res) {
-        console.log('Assignment 5 - Getting movies with reviews, sorted by rating');
-
-        // Exact MongoDB aggregation from assignment requirements
-        Movie.aggregate([
-            {
-                $match: { 
-                    $or: [
-                        { title: 'Guardians of the Galaxy' }
-                    ],
-                    title: { $ne: 'Test Movie HW4' } 
+    .get(function (req, res) {
+        console.log('Assignment 5 - GET /movies');
+        
+        // Check if reviews are requested
+        var includeReviews = req.query.reviews === 'true';
+        
+        if (includeReviews) {
+            console.log('Assignment 5 - Including reviews and sorting by rating');
+            
+            const aggregate = [
+                {
+                    $match: { 
+                        title: { $ne: 'Test Movie HW4' } 
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'reviews',
+                        localField: '_id',
+                        foreignField: 'movieId',
+                        as: 'movieReviews'
+                    }
+                },
+                {
+                    $addFields: {
+                        avgRating: { 
+                            $cond: {
+                                if: { $gt: [{ $size: "$movieReviews" }, 0] },
+                                then: { 
+                                    $round: [
+                                        { $avg: '$movieReviews.rating' },
+                                        1
+                                    ]
+                                },
+                                else: 0
+                            }
+                        },
+                        reviewCount: { $size: "$movieReviews" }
+                    }
+                },
+                {
+                    $sort: { avgRating: -1 }
                 }
-            },
-            {
-                $lookup: {
-                    from: 'reviews',
-                    localField: '_id',
-                    foreignField: 'movieId',
-                    as: 'movieReviews'
-                }
-            },
-            {
-                $addFields: {
-                    avgRating: { $avg: '$movieReviews.rating' }
-                }
-            },
-            {
-                $sort: { avgRating: -1 }
-            }
-        ]).exec(function(err, movies) {
-            if (err) {
-                return res.status(500).json({ 
-                    success: false, 
-                    message: 'Error retrieving movies',
-                    error: err
-                });
-            }
-
-            res.json({ 
-                success: true, 
-                count: movies.length,
-                results: movies
-            });
-        });
+            ];
+            
+            // Rest of your existing code...
+        } else {
+            // Rest of your existing code...
+        }
     });
 
 // Route to get a specific movie with reviews
@@ -1409,11 +1414,6 @@ router.route('/hw5/reviews')
                 review.rating = req.body.rating;
                 
                 console.log('Saving test-movie review for movie:', movie.title, 'ID:', movie._id.toString());
-                console.log('Review details:', {
-                    username: review.username,
-                    review: review.review,
-                    rating: review.rating
-                });
                 
                 review.save(function(err, savedReview) {
                     if (err) {
@@ -1428,24 +1428,51 @@ router.route('/hw5/reviews')
                     // Track the review
                     analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
                     
-                    console.log('Test-movie review saved successfully with ID:', savedReview._id.toString());
-                    res.json({ 
-                        success: true, 
-                        message: 'Review created!',
-                        review: {
-                            _id: savedReview._id,
-                            movieId: savedReview.movieId,
-                            username: savedReview.username,
-                            review: savedReview.review,
-                            rating: savedReview.rating
+                    // Recalculate average rating for the movie
+                    Review.aggregate([
+                        { $match: { movieId: movie._id } },
+                        { $group: { _id: null, avgRating: { $avg: '$rating' } } }
+                    ]).exec(function(err, result) {
+                        if (err) {
+                            console.log('Error recalculating average rating:', err);
+                        } else {
+                            const newAvgRating = result[0] ? result[0].avgRating : 0;
+                            console.log('New average rating for movie:', newAvgRating);
+                            
+                            // Update the movie document with the new average rating
+                            Movie.findByIdAndUpdate(
+                                movie._id,
+                                { $set: { avgRating: newAvgRating } },
+                                { new: true },
+                                function(err, updatedMovie) {
+                                    if (err) {
+                                        console.log('Error updating movie average rating:', err);
+                                    } else {
+                                        console.log('Movie average rating updated to:', updatedMovie.avgRating);
+                                    }
+                                }
+                            );
                         }
+                        
+                        console.log('Test-movie review saved successfully with ID:', savedReview._id.toString());
+                        res.json({ 
+                            success: true, 
+                            message: 'Review created!',
+                            review: {
+                                _id: savedReview._id,
+                                movieId: savedReview.movieId,
+                                username: savedReview.username,
+                                review: savedReview.review,
+                                rating: savedReview.rating
+                            }
+                        });
                     });
                 });
             }
             
             return; // Stop execution here for test-movie case
         }
-
+        
         // Verify the movie exists first (for non test-movie cases)
         Movie.findById(req.body.movieId, function(err, movie) {
             if (err) {
@@ -1492,11 +1519,38 @@ router.route('/hw5/reviews')
                 // Track the review creation with analytics
                 analytics.trackReview(review, movie, analytics.ACTION.POST_REVIEWS);
 
-                console.log('Review saved successfully');
-                res.json({ 
-                    success: true, 
-                    message: 'Review created!',
-                    review: review
+                // Recalculate average rating for the movie
+                Review.aggregate([
+                    { $match: { movieId: movie._id } },
+                    { $group: { _id: null, avgRating: { $avg: '$rating' } } }
+                ]).exec(function(err, result) {
+                    if (err) {
+                        console.log('Error recalculating average rating:', err);
+                    } else {
+                        const newAvgRating = result[0] ? result[0].avgRating : 0;
+                        console.log('New average rating for movie:', newAvgRating);
+                        
+                        // Update the movie document with the new average rating
+                        Movie.findByIdAndUpdate(
+                            movie._id,
+                            { $set: { avgRating: newAvgRating } },
+                            { new: true },
+                            function(err, updatedMovie) {
+                                if (err) {
+                                    console.log('Error updating movie average rating:', err);
+                                } else {
+                                    console.log('Movie average rating updated to:', updatedMovie.avgRating);
+                                }
+                            }
+                        );
+                    }
+                    
+                    console.log('Review saved successfully');
+                    res.json({ 
+                        success: true, 
+                        message: 'Review created!',
+                        review: review
+                    });
                 });
             });
         });
@@ -2232,20 +2286,134 @@ router.route('/setup-guardians-reviews')
                 // Add the reviews
                 Review.insertMany(reviews, function(err, savedReviews) {
                     if (err) {
-                        return res.status(500).json({ 
-                            success: false, 
-                            message: 'Error adding reviews',
-                            error: err
+                        console.log('Error adding reviews:', err);
+                        returnMovieWithReviews(movie, []);
+                    } else {
+                        returnMovieWithReviews(movie, savedReviews);
+                    }
+                });
+            });
+        }
+    });
+
+// Add this new diagnostic endpoint for reviews
+router.route('/hw5/diagnostic/reviews')
+    .get(function (req, res) {
+        console.log('Diagnostic: Checking all reviews in database');
+        
+        Review.find({})
+            .sort({ _id: -1 }) // Get newest first
+            .exec(function(err, reviews) {
+                if (err) {
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Error retrieving reviews',
+                        error: err.message
+                    });
+                }
+                
+                if (!reviews || reviews.length === 0) {
+                    return res.json({
+                        success: true,
+                        message: 'No reviews found in database',
+                        count: 0,
+                        reviews: []
+                    });
+                }
+                
+                // If reviews exist, get the corresponding movie titles
+                const movieIds = [...new Set(reviews.map(r => r.movieId))];
+                
+                Movie.find({ '_id': { $in: movieIds } }, function(err, movies) {
+                    const movieMap = {};
+                    if (movies) {
+                        movies.forEach(m => {
+                            movieMap[m._id] = m.title;
                         });
                     }
                     
-                    res.json({ 
-                        success: true, 
-                        message: 'Guardians of the Galaxy setup complete with exact reviews from the image',
-                        movie: movie,
-                        reviews: savedReviews
+                    // Add movie titles to reviews
+                    const reviewsWithMovieTitles = reviews.map(r => ({
+                        _id: r._id,
+                        movieId: r.movieId,
+                        movieTitle: movieMap[r.movieId] || 'Unknown Movie',
+                        username: r.username,
+                        review: r.review,
+                        rating: r.rating,
+                        date: r._id.getTimestamp()
+                    }));
+                    
+                    res.json({
+                        success: true,
+                        message: 'Reviews retrieved successfully',
+                        count: reviews.length,
+                        reviews: reviewsWithMovieTitles
                     });
                 });
+            });
+    });
+
+// Add this new fixed reviews endpoint that uses consistent calculation
+router.route('/hw5/movie-reviews/:movieId')
+    .get(function (req, res) {
+        const movieId = req.params.movieId;
+        console.log('Getting reviews for movie ID:', movieId);
+        
+        try {
+            const objectId = mongoose.Types.ObjectId(movieId);
+            
+            // First, get the movie to ensure it exists
+            Movie.findById(objectId, function(err, movie) {
+                if (err) {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Error finding movie',
+                        error: err.message
+                    });
+                }
+                
+                if (!movie) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Movie not found'
+                    });
+                }
+                
+                // Now get all reviews for this movie
+                Review.find({ movieId: objectId }, function(err, reviews) {
+                    if (err) {
+                        return res.status(500).json({
+                            success: false,
+                            message: 'Error finding reviews',
+                            error: err.message
+                        });
+                    }
+                    
+                    // Calculate average rating in a consistent way
+                    let avgRating = 0;
+                    if (reviews && reviews.length > 0) {
+                        avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+                        // Round to 1 decimal place for consistency
+                        avgRating = Math.round(avgRating * 10) / 10;
+                    }
+                    
+                    res.json({
+                        success: true,
+                        movie: {
+                            _id: movie._id,
+                            title: movie.title,
+                            avgRating: avgRating
+                        },
+                        reviews: reviews,
+                        count: reviews.length
+                    });
+                });
+            });
+        } catch (e) {
+            // Handle invalid ObjectId format
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid movie ID format'
             });
         }
     });
