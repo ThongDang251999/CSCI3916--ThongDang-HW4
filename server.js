@@ -2450,6 +2450,61 @@ router.route('/hw5/movie-reviews/:movieId')
         }
     });
 
+// Add search endpoint for movies
+router.post('/movies/search', authJwtController.isAuthenticated, function(req, res) {
+    if (!req.body.searchTerm) {
+        return res.status(400).json({ success: false, message: 'Search term is required' });
+    }
+
+    const searchTerm = req.body.searchTerm.toLowerCase();
+    
+    // Create a regex pattern for case-insensitive search
+    const searchPattern = new RegExp(searchTerm, 'i');
+    
+    // Search in both title and actor names
+    Movie.find({
+        $or: [
+            { title: searchPattern },
+            { 'actors.actorName': searchPattern }
+        ]
+    })
+    .exec()
+    .then(movies => {
+        if (!movies || movies.length === 0) {
+            return res.json({ success: true, movies: [] });
+        }
+
+        // Get reviews for all found movies
+        const movieIds = movies.map(movie => movie._id);
+        
+        return Review.find({ movieId: { $in: movieIds } })
+            .exec()
+            .then(reviews => {
+                // Calculate average rating for each movie
+                const moviesWithRatings = movies.map(movie => {
+                    const movieReviews = reviews.filter(review => 
+                        review.movieId.toString() === movie._id.toString()
+                    );
+                    
+                    const avgRating = movieReviews.length > 0
+                        ? movieReviews.reduce((sum, review) => sum + review.rating, 0) / movieReviews.length
+                        : 0;
+
+                    return {
+                        ...movie.toObject(),
+                        averageRating: avgRating.toFixed(1)
+                    };
+                });
+
+                res.json({ success: true, movies: moviesWithRatings });
+            });
+    })
+    .catch(err => {
+        console.error('Error searching movies:', err);
+        res.status(500).json({ success: false, message: 'Error searching movies' });
+    });
+});
+
 app.use('/', router);
 
 app.listen(process.env.PORT || 3001);
