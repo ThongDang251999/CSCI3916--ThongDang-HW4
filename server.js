@@ -402,7 +402,7 @@ router.route('/movies')
             });
         }
     })
-    .post(authJwtController.isAuthenticated, function (req, res) {
+    .post(authJwtController.isAuthenticated, async function (req, res) {
         if (!req.body.title || !req.body.releaseDate || !req.body.genre || !req.body.actors || req.body.actors.length < 3) {
             // Instead of returning an error, create Guardians of the Galaxy by default
             var movie = new Movie();
@@ -415,23 +415,35 @@ router.route('/movies')
                 { actorName: 'Vin Diesel', characterName: 'Groot' }
             ];
             movie.imageUrl = 'https://ichef.bbci.co.uk/images/ic/640x360/p061d1pl.jpg';
+            movie.save(function(err) {
+                if (err) {
+                    return res.status(500).send(err);
+                }
+                res.json({ success: true, message: 'Movie created!' });
+            });
         } else {
-            // If user provided all fields, still create their movie
-            var movie = new Movie();
-            movie.title = req.body.title;
-            movie.releaseDate = req.body.releaseDate;
-            movie.genre = req.body.genre;
-            movie.actors = req.body.actors;
-            // Ensure imageUrl is set (even if it's empty string)
-            movie.imageUrl = req.body.imageUrl || '';
-        }
-        
-        movie.save(function(err) {
-            if (err) {
-                return res.status(500).send(err);
+            // Prevent duplicate movies (same title and releaseDate)
+            try {
+                const existing = await Movie.findOne({ title: req.body.title, releaseDate: req.body.releaseDate });
+                if (existing) {
+                    return res.status(400).json({ success: false, message: 'Movie with this title and release year already exists.' });
+                }
+                var movie = new Movie();
+                movie.title = req.body.title;
+                movie.releaseDate = req.body.releaseDate;
+                movie.genre = req.body.genre;
+                movie.actors = req.body.actors;
+                movie.imageUrl = req.body.imageUrl || '';
+                movie.save(function(err) {
+                    if (err) {
+                        return res.status(500).send(err);
+                    }
+                    res.json({ success: true, message: 'Movie created!' });
+                });
+            } catch (err) {
+                return res.status(500).json({ success: false, message: 'Error checking for duplicates', error: err.message });
             }
-            res.json({ success: true, message: 'Movie created!' });
-        });
+        }
     });
 
 // Get movie by ID with optional reviews

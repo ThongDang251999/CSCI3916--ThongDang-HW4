@@ -1,7 +1,7 @@
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 
-mongoose.connect(process.env.DB);
+// mongoose.connect(process.env.DB); // Removed direct connection
 
 // Define valid genres
 const genres = [
