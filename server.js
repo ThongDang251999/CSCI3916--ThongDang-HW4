@@ -218,69 +218,47 @@ router.post('/signin', function (req, res) {
 
 // Search movies route - must be BEFORE the general /movies/:id route
 router.route('/movies/search')
-    .post(authJwtController.isAuthenticated, function (req, res) {
-        console.log('POST /movies/search - Searching for movies with MongoDB aggregation');
-        
-        if (!req.body.search) {
-            return res.status(400).json({ success: false, message: 'Please provide a search term' });
-        }
-        
-        const searchTerm = req.body.search;
-        const searchRegex = new RegExp(searchTerm, 'i');
-        
-        // IMPORTANT: Extra credit search functionality with aggregation
-        // Search by title, genre, or actor name
-        const aggregate = [
-            {
-                $match: {
-                    $or: [
-                        // Prioritize Guardians of the Galaxy 
-                        { title: 'Guardians of the Galaxy' },
-                        // Only include other movies if they match search AND are not Test Movie HW4
-                        { $and: [
-                            { title: { $ne: 'Test Movie HW4' } },
-                            { $or: [
-                                { title: searchRegex },
-                                { genre: searchRegex },
-                                { 'actors.actorName': searchRegex },
-                                { 'actors.characterName': searchRegex }
-                            ]}
-                        ]}
-                    ]
-                }
-            },
-            {
-                $lookup: {
-                    from: 'reviews',
-                    localField: '_id',
-                    foreignField: 'movieId',
-                    as: 'movieReviews'
-                }
-            },
-            {
-                $addFields: {
-                    avgRating: { $avg: '$movieReviews.rating' }
-                }
-            },
-            {
-                $sort: { avgRating: -1 }
-            }
-        ];
-        
-        Movie.aggregate(aggregate).exec(function(err, movies) {
-            if (err) {
-                return res.status(500).send(err);
+    .post(authJwtController.isAuthenticated, async function (req, res) {
+        try {
+            const { searchTerm } = req.body;
+            
+            if (!searchTerm) {
+                return res.status(400).json({ success: false, message: 'Please provide a search term' });
             }
             
+            // Search in both movie titles and actor names
+            const movies = await Movie.find({
+                $or: [
+                    { title: { $regex: searchTerm, $options: 'i' } },
+                    { 'actors.actorName': { $regex: searchTerm, $options: 'i' } },
+                    { 'actors.characterName': { $regex: searchTerm, $options: 'i' } }
+                ]
+            }).populate('reviews');
+
+            // Calculate average rating for each movie
+            const moviesWithRatings = movies.map(movie => {
+                const avgRating = movie.reviews && movie.reviews.length > 0
+                    ? movie.reviews.reduce((sum, review) => sum + review.rating, 0) / movie.reviews.length
+                    : 0;
+                
+                return {
+                    ...movie.toObject(),
+                    avgRating
+                };
+            });
+
             // Track analytics for search
-            if (movies.length > 0) {
-                movies.forEach(movie => {
+            if (moviesWithRatings.length > 0) {
+                moviesWithRatings.forEach(movie => {
                     analytics.trackMovie(movie, analytics.ACTION.SEARCH_MOVIES);
                 });
             }
-            
-            res.json(movies);
-        });
+
+            res.json(moviesWithRatings);
+        } catch (error) {
+            console.error('Error searching movies:', error);
+            res.status(500).json({ success: false, message: 'Error searching movies', error: error.message });
+        }
     });
 
 // Top rated movies route - must be BEFORE the general /movies/:id route
@@ -2451,58 +2429,102 @@ router.route('/hw5/movie-reviews/:movieId')
     });
 
 // Add search endpoint for movies
-router.post('/movies/search', authJwtController.isAuthenticated, function(req, res) {
-    if (!req.body.searchTerm) {
-        return res.status(400).json({ success: false, message: 'Search term is required' });
-    }
+router.post('/movies/search', authJwtController.isAuthenticated, async function(req, res) {
+    try {
+        // Validate search term
+        if (!req.body.searchTerm) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Search term is required',
+                error: 'MISSING_SEARCH_TERM'
+            });
+        }
 
-    const searchTerm = req.body.searchTerm.toLowerCase();
-    
-    // Create a regex pattern for case-insensitive search
-    const searchPattern = new RegExp(searchTerm, 'i');
-    
-    // Search in both title and actor names
-    Movie.find({
-        $or: [
-            { title: searchPattern },
-            { 'actors.actorName': searchPattern }
-        ]
-    })
-    .exec()
-    .then(movies => {
+        // Validate search term length
+        if (req.body.searchTerm.trim().length < 2) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Search term must be at least 2 characters long',
+                error: 'INVALID_SEARCH_TERM_LENGTH'
+            });
+        }
+
+        const searchTerm = req.body.searchTerm.toLowerCase();
+        
+        // Create a regex pattern for case-insensitive search
+        const searchPattern = new RegExp(searchTerm, 'i');
+        
+        // Search in both title and actor names
+        const movies = await Movie.find({
+            $or: [
+                { title: searchPattern },
+                { 'actors.actorName': searchPattern },
+                { 'actors.characterName': searchPattern }
+            ]
+        }).exec();
+
         if (!movies || movies.length === 0) {
-            return res.json({ success: true, movies: [] });
+            return res.json({ 
+                success: true, 
+                message: 'No movies found matching your search criteria',
+                movies: [] 
+            });
         }
 
         // Get reviews for all found movies
         const movieIds = movies.map(movie => movie._id);
         
-        return Review.find({ movieId: { $in: movieIds } })
-            .exec()
-            .then(reviews => {
-                // Calculate average rating for each movie
-                const moviesWithRatings = movies.map(movie => {
-                    const movieReviews = reviews.filter(review => 
-                        review.movieId.toString() === movie._id.toString()
-                    );
-                    
-                    const avgRating = movieReviews.length > 0
-                        ? movieReviews.reduce((sum, review) => sum + review.rating, 0) / movieReviews.length
-                        : 0;
+        const reviews = await Review.find({ movieId: { $in: movieIds } }).exec();
 
-                    return {
-                        ...movie.toObject(),
-                        averageRating: avgRating.toFixed(1)
-                    };
-                });
+        // Calculate average rating for each movie
+        const moviesWithRatings = movies.map(movie => {
+            const movieReviews = reviews.filter(review => 
+                review.movieId.toString() === movie._id.toString()
+            );
+            
+            const avgRating = movieReviews.length > 0
+                ? movieReviews.reduce((sum, review) => sum + review.rating, 0) / movieReviews.length
+                : 0;
 
-                res.json({ success: true, movies: moviesWithRatings });
+            return {
+                ...movie.toObject(),
+                averageRating: avgRating.toFixed(1)
+            };
+        });
+
+        res.json({ 
+            success: true, 
+            message: `Found ${moviesWithRatings.length} movies matching your search`,
+            movies: moviesWithRatings 
+        });
+
+    } catch (error) {
+        console.error('Error searching movies:', error);
+        
+        // Handle specific error types
+        if (error.name === 'CastError') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid movie ID format',
+                error: 'INVALID_ID_FORMAT'
             });
-    })
-    .catch(err => {
-        console.error('Error searching movies:', err);
-        res.status(500).json({ success: false, message: 'Error searching movies' });
-    });
+        }
+        
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid search parameters',
+                error: 'VALIDATION_ERROR'
+            });
+        }
+
+        // Generic error handler
+        res.status(500).json({ 
+            success: false, 
+            message: 'An error occurred while searching movies',
+            error: 'INTERNAL_SERVER_ERROR'
+        });
+    }
 });
 
 app.use('/', router);
