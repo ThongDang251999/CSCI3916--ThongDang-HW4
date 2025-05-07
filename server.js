@@ -72,6 +72,50 @@ Movie.deleteMany({ title: 'Test Movie HW4' }).exec()
         if (guardians) {
             console.log('Guardians of the Galaxy movie is ready');
         }
+        // --- Remove all Dark Knight entries and insert a clean one ---
+        return Movie.deleteMany({ title: 'The Dark Knight' }).exec();
+    })
+    .then(() => {
+        console.log('Removed all The Dark Knight entries');
+        var newDarkKnight = new Movie({
+            title: 'The Dark Knight',
+            releaseDate: 2008,
+            genre: 'Action',
+            actors: [
+                { actorName: 'Christian Bale', characterName: 'Bruce Wayne' },
+                { actorName: 'Heath Ledger', characterName: 'Joker' },
+                { actorName: 'Aaron Eckhart', characterName: 'Harvey Dent' }
+            ],
+            imageUrl: 'https://upload.wikimedia.org/wikipedia/en/8/8a/Dark_Knight.jpg'
+        });
+        return newDarkKnight.save();
+    })
+    .then(() => {
+        console.log('Inserted clean The Dark Knight movie');
+        // --- Ensure The Wolf of Wall Street exists ---
+        return Movie.findOne({ title: 'The Wolf of Wall Street' }).exec();
+    })
+    .then(wolf => {
+        if (!wolf) {
+            console.log('Creating The Wolf of Wall Street movie');
+            var newWolf = new Movie({
+                title: 'The Wolf of Wall Street',
+                releaseDate: 2013,
+                genre: 'Drama',
+                actors: [
+                    { actorName: 'Leonardo DiCaprio', characterName: 'Jordan Belfort' },
+                    { actorName: 'Jonah Hill', characterName: 'Donnie Azoff' }
+                ],
+                imageUrl: 'https://upload.wikimedia.org/wikipedia/en/1/1f/WallStreet2013poster.jpg'
+            });
+            return newWolf.save();
+        }
+        return wolf;
+    })
+    .then(wolf => {
+        if (wolf) {
+            console.log('The Wolf of Wall Street movie is ready');
+        }
     })
     .catch(err => {
         console.error('Error in startup movie preparation:', err);
