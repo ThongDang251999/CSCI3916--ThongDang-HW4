@@ -106,9 +106,13 @@ Movie.deleteMany({ title: 'Test Movie HW4' }).exec()
                     { actorName: 'Leonardo DiCaprio', characterName: 'Jordan Belfort' },
                     { actorName: 'Jonah Hill', characterName: 'Donnie Azoff' }
                 ],
-                imageUrl: 'https://upload.wikimedia.org/wikipedia/en/1/1f/WallStreet2013poster.jpg'
+                imageUrl: 'https://m.media-amazon.com/images/M/MV5BMjIxMjgxNTk0MF5BMl5BanBnXkFtZTgwNjIyOTg2MDE@._V1_.jpg'
             });
             return newWolf.save();
+        } else if (wolf.imageUrl !== 'https://m.media-amazon.com/images/M/MV5BMjIxMjgxNTk0MF5BMl5BanBnXkFtZTgwNjIyOTg2MDE@._V1_.jpg') {
+            // Update imageUrl if it's not correct
+            wolf.imageUrl = 'https://m.media-amazon.com/images/M/MV5BMjIxMjgxNTk0MF5BMl5BanBnXkFtZTgwNjIyOTg2MDE@._V1_.jpg';
+            return wolf.save();
         }
         return wolf;
     })
