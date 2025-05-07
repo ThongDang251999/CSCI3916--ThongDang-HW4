@@ -2539,6 +2539,25 @@ router.post('/movies/search', authJwtController.isAuthenticated, async function(
     }
 });
 
+// Add the /movies/search endpoint
+router.post('/movies/search', authJwtController.isAuthenticated, async function(req, res) {
+    try {
+        const { searchTerm, searchType } = req.body;
+        if (!searchTerm || typeof searchTerm !== 'string' || !searchTerm.trim()) {
+            return res.status(400).json({ success: false, message: 'Please provide a valid searchTerm.' });
+        }
+        // Use case-insensitive regex
+        const regex = new RegExp(searchTerm, 'i');
+        // Use the aggregation pipeline
+        const pipeline = mongoAggregations.searchMovies(regex);
+        const movies = await Movie.aggregate(pipeline).exec();
+        res.json({ success: true, count: movies.length, results: movies });
+    } catch (err) {
+        console.error('Error in /movies/search:', err);
+        res.status(500).json({ success: false, message: 'Error searching movies', error: err.message });
+    }
+});
+
 app.use('/', router);
 
 app.listen(process.env.PORT || 3001);
