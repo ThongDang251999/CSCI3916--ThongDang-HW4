@@ -2590,7 +2590,7 @@ router.post('/movies/search', authJwtController.isAuthenticated, async function(
 // Add the /movies/search endpoint
 router.post('/movies/search', authJwtController.isAuthenticated, async function(req, res) {
     try {
-        const { searchTerm, searchType } = req.body;
+        const { searchTerm } = req.body;
         if (!searchTerm || typeof searchTerm !== 'string' || !searchTerm.trim()) {
             return res.status(400).json({ success: false, message: 'Please provide a valid searchTerm.' });
         }
